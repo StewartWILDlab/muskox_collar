@@ -3,7 +3,7 @@ library(sf)
 library(terra)
 
 ### load attribute data for land cover values
-lc_atts <- read_csv("data/raw/ClassIndex_IndiceDeClasse.csv",
+lc_atts <- read_csv("data/raw/landcover/ClassIndex_IndiceDeClasse.csv",
                     col_names = c("Value", "Classification", "RGB"),
                     skip = 1) %>%
   separate(RGB,c("R","G","B"),"; ", convert = TRUE) %>%
@@ -15,7 +15,7 @@ lc_atts <- read_csv("data/raw/ClassIndex_IndiceDeClasse.csv",
 musk_collar <- readRDS("data/processed/musk_collar.rds")
 
 ### Load land cover Canada 2010 data
-lc_2010 <- rast("data/raw/landcover-2010-classification.tif")
+lc_2010 <- rast("data/raw/landcover/landcover-2010-classification.tif")
 
 ### buffer to collar data 1km
 buffer <- musk_collar %>%
