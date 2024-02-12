@@ -1,3 +1,12 @@
+######################################################
+############ Muskox Collar Project ############ 
+######################################################
+### Using muskox collar data from the Sahtu region, NWT to investigate
+### muskox habitat, home range, and movement behaviour below treeline
+
+######################################################
+### Script to crop raster data to extent of muskox collar data
+
 library(tidyverse)
 library(sf)
 library(terra)
@@ -15,15 +24,15 @@ lc_atts <- read_csv("data/raw/landcover/ClassIndex_IndiceDeClasse.csv",
 musk_collar <- readRDS("data/processed/musk_collar.rds")
 
 ### Load land cover Canada 2010 data
-lc_2010 <- rast("data/raw/landcover/landcover-2010-classification.tif")
+lc_2010 <- terra::rast("data/raw/landcover/landcover-2010-classification.tif")
 
-### buffer to collar data 1km
+### buffer collar data 1km
 buffer <- musk_collar %>%
-  st_transform(crs(lc_2010)) %>%
-  st_buffer(dist = 10000)
+  sf::st_transform(terra::crs(lc_2010)) %>%
+  sf::st_buffer(dist = 10000)
 
 ### crop land cover data to collar data buffer
-lc_2010_crop <- crop(lc_2010, buffer) %>%
+lc_2010_crop <- terra::crop(lc_2010, buffer) %>%
   ### change numeric values to land classification
   subst(lc_atts$Value,lc_atts$Classification) 
 
