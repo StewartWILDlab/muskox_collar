@@ -1,0 +1,90 @@
+---
+title: "Muskox Collar Data Exploration"
+format: html
+editor: visual
+execute: 
+  cache: TRUE
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(here)
+```
+
+```{r}
+#| label: load-data
+#| include: false
+
+musk_collar <- readRDS(here("data/processed/musk_collar.rds"))
+lc_2010_crop <- readRDS(here("data/processed/lc_2010_crop.rds"))
+```
+
+## Data Exploration
+
+Movement data for this project come from `r length(unique(musk_collar$Id_Number))` female muskoxen in the Sahtu region of the Northwest Territories (NWT) that were collared between `r format(min(musk_collar$Date), "%B %Y")` and `r format(max(musk_collar$Date), "%B %Y")`. 
+
+We can plot the date ranges of individual collared muskoxen below:
+
+```{r}
+#| label: daterange
+#| dependson: "load-data"
+#| echo: FALSE
+
+daterange <- musk_collar %>% 
+  sf::st_drop_geometry() %>% 
+  group_by(Id_Number) %>% 
+  summarize(DateRange = paste(format(min(Date), "%b %Y"), 
+                              format(max(Date), "%b %Y"), sep = " to "),
+            NumDays = as.numeric(difftime(max(Date), min(Date), 
+                                            units = "days")))
+
+knitr::kable(daterange) %>% 
+  kableExtra::kable_styling(full_width = FALSE)
+```
+
+Muskoxen `r head(daterange$Id_Number[which(daterange$NumDays<365)],-1)`, and `r tail(daterange$Id_Number[which(daterange$NumDays<365)],1)` have less than a year of movement data and only `r head(daterange$Id_Number[which(daterange$NumDays>365*2)],-1)`, and `r tail(daterange$Id_Number[which(daterange$NumDays>365*2)],1)` have more than 2 years of data.
+
+We can plot histograms of movement distances for each muskox:
+
+```{r}
+#| label: dist_hist
+#| dependson: "load-data"
+#| echo: FALSE
+#| warning: FALSE
+
+musk_collar %>%
+  ## add one to distances to allow 0s to be plotted on log scale
+  mutate(distance_m = distance_m + 1) %>%
+  ggplot(aes(x = distance_m)) +
+  geom_histogram(fill = "darkblue") +
+  scale_x_log10() +
+  facet_wrap(~Id_Number, scales = "free_y") +
+  theme_bw()
+
+```
+
+The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For some muskoxen, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. Possible reasons include GPS malfunction, mortality, or dropped collars. We can explore this further by plotting the distances travelled with time:
+
+```{r}
+#| label: dist_time
+#| dependson: "load-data"
+#| echo: FALSE
+#| warning: FALSE
+
+musk_collar %>%
+  ## add one to distances to allow 0s to be plotted on log scale
+  mutate(distance_m = distance_m + 1) %>%
+  ggplot(aes(x = datetime, y = distance_m)) +
+  geom_line(fill = "darkblue") +
+  scale_y_log10() +
+  facet_wrap(~Id_Number, scales = "free_x") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+Muskoxen 707, 709, and 710 have extended periods of time at the end of their time series where the collar data suggest negligible movements.
+
+The time series of movement distances suggest that 

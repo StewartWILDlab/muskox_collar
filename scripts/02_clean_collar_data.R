@@ -9,6 +9,10 @@
 
 library(tidyverse)
 
+## default empty point to fill in missing values when calculating distances 
+## between successive points
+empty <- sf::st_as_sfc("POINT(EMPTY)", crs = sf::st_crs(musk_collar))
+
 musk_collar <- sf::st_read("data/raw/muskox_data/Muskox_GPS.shp") %>%
   ### add time to date
   mutate(
@@ -18,7 +22,14 @@ musk_collar <- sf::st_read("data/raw/muskox_data/Muskox_GPS.shp") %>%
     Id_Number = as.factor(Id_Number),
     month = month(datetime),
     year = year(datetime)
-  )
+  ) %>% 
+  ## add column for distance traveled from previous point
+  group_by(Id_Number) %>% 
+  arrange(datetime) %>%
+  mutate(distance_m = sf::st_distance(geometry, 
+                                    lag(geometry, default = empty),
+                                    by_element = TRUE),
+         distance_m = as.numeric(distance_m))
 
 saveRDS(musk_collar, "data/processed/musk_collar.rds")
 
