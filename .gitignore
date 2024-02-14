@@ -3,5 +3,6 @@
 .RData
 .Ruserdata
 *.tif
-data/
-output/
+data/raw/*
+data/processed/*
+output/*
