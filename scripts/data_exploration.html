@@ -134,19 +134,21 @@ ul.task-list li input[type="checkbox"] {
 
 </div>
 </div>
-<p>Muskox 707, 709, 710, and 7010 have less than a year of movement data and only 7011, 7012, and 7013 have more than 2 years of data.</p>
+<p>Muskoxen 707, 709, 710, and 7010 have less than a year of movement data and only 7011, 7012, and 7013 have more than 2 years of data.</p>
 <p>We can plot histograms of movement distances for each muskox:</p>
-<div class="cell" data-hash="data_exploration_cache/html/dist_hist_2bbe91bb58b6281f20f085e48387d336">
+<div class="cell" data-hash="data_exploration_cache/html/dist_hist_e92ec7bf8d1c79ba48424d4dbb9c8066">
 <div class="cell-output-display">
 <p><img src="data_exploration_files/figure-html/dist_hist-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For some muskoxen, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. Possible reasons include GPS malfunction, mortality, or dropped collars. We can explore this further by plotting the distances travelled with time:</p>
-<div class="cell" data-hash="data_exploration_cache/html/dist_time_b42b165200090111b6b6ea0f61c147c9">
+<div class="cell" data-hash="data_exploration_cache/html/dist_time_b23a8f0d88c42be66bf8242bbc86f62b">
 <div class="cell-output-display">
 <p><img src="data_exploration_files/figure-html/dist_time-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
+<p>Muskoxen 707, 709, and 710 have extended periods of time at the end of their time series where the collar data suggest negligible movements.</p>
+<p>Movement distances tend to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997).</p>
 </section>
 
 </main>

@@ -57,13 +57,12 @@ We can plot histograms of movement distances for each muskox:
 
 musk_collar %>%
   ## add one to distances to allow 0s to be plotted on log scale
-  mutate(distance_m = distance_m + 1) %>%
-  ggplot(aes(x = distance_m)) +
+  mutate(steplength_m = steplength_m + 1) %>%
+  ggplot(aes(x = steplength_m)) +
   geom_histogram(fill = "darkblue") +
   scale_x_log10() +
   facet_wrap(~Id_Number, scales = "free_y") +
   theme_bw()
-
 ```
 
 The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For some muskoxen, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. Possible reasons include GPS malfunction, mortality, or dropped collars. We can explore this further by plotting the distances travelled with time:
@@ -76,15 +75,25 @@ The stepped nature of the distances traveled on the left side of the graph are a
 
 musk_collar %>%
   ## add one to distances to allow 0s to be plotted on log scale
-  mutate(distance_m = distance_m + 1) %>%
-  ggplot(aes(x = datetime, y = distance_m)) +
-  geom_line(fill = "darkblue") +
+  mutate(steplength_m = steplength_m + 1,
+         Season = case_when(
+           between(month, 3, 5) ~ "Spring",
+           between(month, 6, 8) ~ "Summer",
+           between(month, 9, 11) ~ "Autumn",
+           TRUE ~ "Winter"),
+         Season = factor(Season,
+                         levels = c("Winter", "Spring",
+                                    "Summer", "Autumn"))
+    ) %>%
+  ggplot(aes(x = datetime, y = steplength_m)) +
+  geom_point(aes(colour = Season), size = 0.5) +
   scale_y_log10() +
   facet_wrap(~Id_Number, scales = "free_x") +
+  scale_colour_manual(values = c("lightblue","springgreen","yellow","orange")) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
 Muskoxen 707, 709, and 710 have extended periods of time at the end of their time series where the collar data suggest negligible movements.
 
-The time series of movement distances suggest that 
+Movement distances tend to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997). 

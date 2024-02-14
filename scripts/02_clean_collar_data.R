@@ -26,10 +26,10 @@ musk_collar <- sf::st_read("data/raw/muskox_data/Muskox_GPS.shp") %>%
   ## add column for distance traveled from previous point
   group_by(Id_Number) %>% 
   arrange(datetime) %>%
-  mutate(distance_m = sf::st_distance(geometry, 
+  mutate(steplength_m = sf::st_distance(geometry, 
                                     lag(geometry, default = empty),
                                     by_element = TRUE),
-         distance_m = as.numeric(distance_m))
+         steplength_m = as.numeric(steplength_m))
 
 saveRDS(musk_collar, "data/processed/musk_collar.rds")
 
