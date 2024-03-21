@@ -154,33 +154,13 @@ sdl_musk <- musk_collar_fix %>%
 
 First let's use *dupfilter* to remove duplicate data points with the same date and time.
 
-```{r, fig.height=6, fig.width=8}
+```{r}
 #| label: sdl_dup
 #| dependson: "sdl_musk"
 #| echo: TRUE
 #| warning: FALSE
 
 sdl_dup <- SDLfilter::dupfilter(sdl_musk, conditional = TRUE)
-```
-
-```{r}
-#| dependson: "sdl_dup"
-#| echo: FALSE
-#| warning: FALSE
-sdl_musk %>%
-  ## identify points that were identified as duplicates
-  mutate(
-    flag = ifelse(rowid %in% sdl_dup$rowid,"retained","removed"),
-    steplength_m = steplength_m + 1
-    ) %>%
-  ggplot(aes(x = DateTime, y = steplength_m)) +
-  geom_point(aes(colour = flag, size = flag)) +
-  scale_y_log10() +
-  facet_wrap(~id, scales = "free_x") +
-  scale_size_manual(values = c(1,0.5)) +
-  scale_colour_manual(values = c("red", "grey")) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
 Next we'll use *ddfilter* to filter points based on speed and turning angles between consecutive points. To use this function, we need to estimate the maximum reasonable speed between two consecutive locations. The *vmax* function maps a gamma distribution to the observed speeds and estimates the maximum speed as the value with a cumulative probability of 0.999.
@@ -206,16 +186,22 @@ vmaxlp <- SDLfilter::vmaxlp(sdl_dup, prob = 0.999)
 
 Now we can filter our data using *ddfilter*. Locations are removed if one of following criteria are met: 1) speed from previous and to subsequent location both exceed **vmax**; 2) inner angle is less than a given threshold and speed from a previous or to a subsequent location exceeds **vmaxlp**. We will specify a turning angle of 14 degrees, as outlined in Bjørneraas et al. 2010.
 
-```{r, fig.height=6, fig.width=8}
+```{r}
 #| label: sdl_dd1
 #| dependson: "vmaxlp"
-#| echo: FALSE
+#| echo: TRUE
 #| warning: FALSE
 
 sdl_dd1 <- SDLfilter::ddfilter(sdl_dup, qi = 5, 
                               vmax = vmax, vmaxlp = vmaxlp,
                               ia = 14)
 
+```
+
+```{r, fig.height=6, fig.width=8}
+#| dependson: "sdl_dd1"
+#| echo: FALSE
+#| warning: FALSE
 sdl_dup %>%
   ## identify points that were identified as duplicates
   mutate(
@@ -231,20 +217,27 @@ sdl_dup %>%
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
-The filtered points appear non-randomly across the time series, which  suggests that our speed thresholds were too small. Let's increase **vmax** to a more conservative value of 2 km/h.
 
-```{r, fig.height=6, fig.width=8}
+The filtered points appear non-randomly across the time series, which  suggests that our speed thresholds were too small. Let's increase **vmax** and **vmaxlp** to more conservative values of 2 km/h and 1 km/h, respectively.
+
+```{r}
 #| label: sdl_dd2
 #| dependson: "vmaxlp"
-#| echo: FALSE
+#| echo: TRUE
 #| warning: FALSE
 
 sdl_dd2 <- SDLfilter::ddfilter(sdl_dup, qi = 5, 
-                              vmax = 2, vmaxlp = vmaxlp,
+                              vmax = 2, vmaxlp = 1,
                               ia = 14)
 
+```
+
+```{r, fig.height=6, fig.width=8}
+#| dependson: "sdl_dd2"
+#| echo: FALSE
+#| warning: FALSE
 sdl_dup %>%
-  ## identify points that were indentified as duplicates
+  ## identify points that were identified as duplicates
   mutate(
     flag = ifelse(rowid %in% sdl_dd2$rowid,"retained","removed"),
     steplength_m = steplength_m + 1
@@ -258,6 +251,18 @@ sdl_dup %>%
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
+That seems to do a better job of only removing the most extreme points. 
+
+Lastly, we will remove any points collected within 24 hours of collar deployments to remove the immediate effects of capture and handling.
+
+```{r}
+#| label: musk_collar_filt
+#| dependson: "sdl_dd2"
+#| echo: FALSE
+#| warning: FALSE
+
+deploy <- read_csv("data/raw/")
+
 ```
 
 

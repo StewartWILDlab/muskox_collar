@@ -213,7 +213,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>Now that we have removed data that we know contain errors, we can start to look for less obvious sources of errors. The SDLfilter package has two functions, <em>dupfilter</em> and <em>ddfilter,</em> that remove data duplicates and unlikely points, respectively.</p>
 <p>First let’s use <em>dupfilter</em> to remove duplicate data points with the same date and time.</p>
-<div class="cell" data-hash="data_exploration_cache/html/sdl_dup_ccabfc5453056b8c764c1aa77f16ed03">
+<div class="cell" data-hash="data_exploration_cache/html/sdl_dup_7edb61dbdff0bcf9d5aac0fad9ded89e">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>sdl_dup <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">dupfilter</span>(sdl_musk, <span class="at">conditional =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
@@ -227,12 +227,7 @@ Filtered data: 14041 locations
 dupfilter removed 24 locations (0.17% of original data)</code></pre>
 </div>
 </div>
-<div class="cell" data-hash="data_exploration_cache/html/unnamed-chunk-9_463f3506d41adf134e7618a284abc82e">
-<div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid" width="672"></p>
-</div>
-</div>
-<p>Next we’ll use <em>ddfilter</em> to filter points based on speed and turning angles between consecutive points. To use this function, we need to estimate the maximum reasonable speed between two consecutive locations. The <em>vmax</em> function maps a gamma distribution to the observed speeds and estimates the maximum speed as the value with a cumulative probability of 0.99.</p>
+<p>Next we’ll use <em>ddfilter</em> to filter points based on speed and turning angles between consecutive points. To use this function, we need to estimate the maximum reasonable speed between two consecutive locations. The <em>vmax</em> function maps a gamma distribution to the observed speeds and estimates the maximum speed as the value with a cumulative probability of 0.999.</p>
 <div class="cell" data-hash="data_exploration_cache/html/vmax_cf53ac550fa3671ecdd78ee91a805f71">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>vmax <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">vmax</span>(sdl_dup, <span class="at">prob =</span> <span class="fl">0.999</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -272,7 +267,10 @@ vmaxlp: 0.27 km/h</code></pre>
 </div>
 </div>
 <p>Now we can filter our data using <em>ddfilter</em>. Locations are removed if one of following criteria are met: 1) speed from previous and to subsequent location both exceed <strong>vmax</strong>; 2) inner angle is less than a given threshold and speed from a previous or to a subsequent location exceeds <strong>vmaxlp</strong>. We will specify a turning angle of 14 degrees, as outlined in Bjørneraas et al.&nbsp;2010.</p>
-<div class="cell" data-hash="data_exploration_cache/html/sdl_dd1_242953e6cde48bf7759de8dd300f9aab">
+<div class="cell" data-hash="data_exploration_cache/html/sdl_dd1_fde69cec09cecffe82e2d0dfcd4cc85f">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>sdl_dd1 <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">ddfilter</span>(sdl_dup, <span class="at">qi =</span> <span class="dv">5</span>, </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">vmax =</span> vmax, <span class="at">vmaxlp =</span> vmaxlp,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                              <span class="at">ia =</span> <span class="dv">14</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 ddfilter_speed removed 36 of 14041 locations
@@ -282,26 +280,34 @@ Input data: 14041 locations
 Filtered data: 13958 locations
 ddfilter removed 83 locations (0.59% of original data)</code></pre>
 </div>
+</div>
+<div class="cell" data-hash="data_exploration_cache/html/unnamed-chunk-12_2077558a605adf5e7a71a69fdced7f73">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/sdl_dd1-1.png" class="img-fluid" width="768"></p>
+<p><img src="data_exploration_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid" width="768"></p>
 </div>
 </div>
-<p>The filtered points appear non-randomly across the time series, which suggests that our speed thresholds were too small. Let’s increase <strong>vmax</strong> to a more conservative value of 2 km/h.</p>
-<div class="cell" data-hash="data_exploration_cache/html/sdl_dd2_90219eb5b58b07d1d560bbc070beaedc">
+<p>The filtered points appear non-randomly across the time series, which suggests that our speed thresholds were too small. Let’s increase <strong>vmax</strong> and <strong>vmaxlp</strong> to more conservative values of 2 km/h and 1 km/h, respectively.</p>
+<div class="cell" data-hash="data_exploration_cache/html/sdl_dd2_9ff618977f9ccb2ac183272656ca3054">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sdl_dd2 <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">ddfilter</span>(sdl_dup, <span class="at">qi =</span> <span class="dv">5</span>, </span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">vmax =</span> <span class="dv">2</span>, <span class="at">vmaxlp =</span> <span class="dv">1</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>                              <span class="at">ia =</span> <span class="dv">14</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 ddfilter_speed removed 1 of 14041 locations
-ddfilter_loop removed 45 of 14040 locations
+ddfilter_loop removed 7 of 14040 locations
 
 Input data: 14041 locations
-Filtered data: 13995 locations
-ddfilter removed 46 locations (0.33% of original data)</code></pre>
+Filtered data: 14033 locations
+ddfilter removed 8 locations (0.06% of original data)</code></pre>
 </div>
+</div>
+<div class="cell" data-hash="data_exploration_cache/html/unnamed-chunk-14_0b4b344078cca9f05e59d39545ebf6ac">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/sdl_dd2-1.png" class="img-fluid" width="768"></p>
+<p><img src="data_exploration_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="768"></p>
 </div>
 </div>
-<p>```</p>
+<p>That seems to do a better job of only removing the most extreme points.</p>
+<p>Lastly, we will remove any points collected within 24 hours of collar deployments to remove the immediate effects of capture and handling.</p>
 </section>
 <section id="movement-trends" class="level2">
 <h2 class="anchored" data-anchor-id="movement-trends">Movement Trends</h2>
