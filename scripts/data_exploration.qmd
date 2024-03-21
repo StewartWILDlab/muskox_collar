@@ -11,6 +11,8 @@ execute:
 #| include: false
 
 library(tidyverse)
+library(sf)
+library(terra)
 library(here)
 ```
 
@@ -19,12 +21,12 @@ library(here)
 #| include: false
 
 musk_collar <- readRDS(here("data/processed/musk_collar.rds"))
-lc_2010_crop <- readRDS(here("data/processed/lc_2010_crop.rds"))
+lc_2010_proj <- rast(here("data/processed/lc_2010_proj.tif"))
 ```
 
-## Data Exploration
+## Sample Size
 
-Movement data for this project come from `r length(unique(musk_collar$Id_Number))` female muskoxen in the Sahtu region of the Northwest Territories (NWT) that were collared between `r format(min(musk_collar$Date), "%B %Y")` and `r format(max(musk_collar$Date), "%B %Y")`. 
+Movement data for this project come from `r length(unique(musk_collar$Id_Number))` female muskoxen in the Sahtu region of the Northwest Territories (NWT) that were collared between `r format(min(musk_collar$Date), "%B %Y")` and `r format(max(musk_collar$Date), "%B %Y")`.
 
 We can plot the date ranges of individual collared muskoxen below:
 
@@ -47,7 +49,9 @@ knitr::kable(daterange) %>%
 
 Muskoxen `r head(daterange$Id_Number[which(daterange$NumDays<365)],-1)`, and `r tail(daterange$Id_Number[which(daterange$NumDays<365)],1)` have less than a year of movement data and only `r head(daterange$Id_Number[which(daterange$NumDays>365*2)],-1)`, and `r tail(daterange$Id_Number[which(daterange$NumDays>365*2)],1)` have more than 2 years of data.
 
-We can plot histograms of movement distances for each muskox:
+## Pre-processing
+
+Before we look into the data, there are some data cleaning steps we can use to remove errors from that dataset. First, we know that collars 707, 709, and 710 had their release mechanisms triggered early, so we need to look at the data to figure out when this happened. Let's start by looking at histograms of step lengths:
 
 ```{r}
 #| label: dist_hist
@@ -65,9 +69,9 @@ musk_collar %>%
   theme_bw()
 ```
 
-The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For some muskoxen, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. Possible reasons include GPS malfunction, mortality, or dropped collars. We can explore this further by plotting the distances travelled with time:
+The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For collars 707, 709, and 710, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. By plotting time series of step lengths, we can can see that these negligible distances occur at the end of the recording periods:
 
-```{r}
+```{r, fig.height=6, fig.width=8}
 #| label: dist_time
 #| dependson: "load-data"
 #| echo: FALSE
@@ -87,13 +91,267 @@ musk_collar %>%
     ) %>%
   ggplot(aes(x = datetime, y = steplength_m)) +
   geom_point(aes(colour = Season), size = 0.5) +
+  geom_smooth(method = "loess", span = 0.25, alpha = 0.5) +
   scale_y_log10() +
   facet_wrap(~Id_Number, scales = "free_x") +
-  scale_colour_manual(values = c("lightblue","springgreen","yellow","orange")) +
+  scale_colour_manual(values = c("lightblue3","springgreen","yellow2","orange")) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
-Muskoxen 707, 709, and 710 have extended periods of time at the end of their time series where the collar data suggest negligible movements.
+For simplicity, let's remove all points following the first two consecutive short step lengths (i.e. 0 or `r min(musk_collar$steplength_m[musk_collar$steplength_m!=0], na.rm = TRUE)`) at the end of the time series.
 
-Movement distances tend to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997). 
+```{r}
+#| label: fix_data
+#| dependson: "daterange"
+#| echo: FALSE
+#| warning: FALSE
+
+xdate_707 <- as.Date("2008-01-10")
+xdate_709 <- as.Date("2008-03-22")
+xdate_710 <- as.Date("2008-04-10")
+
+musk_collar_fix <- musk_collar %>%
+  filter(Id_Number!=707|Date<xdate_707,
+         Id_Number!=709|Date<xdate_709,
+         Id_Number!=710|Date<xdate_710)
+daterange_fix <- musk_collar_fix %>% 
+  sf::st_drop_geometry() %>% 
+  group_by(Id_Number) %>% 
+  summarize(NumDays_fix = as.numeric(difftime(max(Date), min(Date), 
+                                            units = "days")))
+daterange %>%
+  left_join(daterange_fix) %>%
+  filter(Id_Number%in%c(707,709,710)) %>%
+  mutate(DaysRemoved = NumDays - NumDays_fix) %>%
+  select(Id_Number, DaysRemoved) %>%
+  knitr::kable()
+
+```
+
+Now that we have removed data that we know contain errors, we can start to look for less obvious sources of errors. The SDLfilter package has two functions, *dupfilter* and *ddfilter,* that remove data duplicates and unlikely points, respectively.
+
+```{r}
+#| label: sdl_musk
+#| dependson: "fix_data"
+#| echo: FALSE
+#| warning: FALSE
+
+### rename columns in dataframe for SDLfilter functions
+sdl_musk <- musk_collar_fix %>%
+  rename(id = Id_Number,
+         lat = Latitude,
+         lon = Longitude,
+         DateTime = datetime) %>%
+  rowid_to_column() %>%
+  sf::st_drop_geometry() %>%
+  ## the fundtions also require a column for number of satellite fixes,
+  ## but we don't have those data so we'll just fill in a column with 
+  ## the minimum required value of 4.
+  mutate(qi = 5) %>%
+  as.data.frame()
+```
+
+First let's use *dupfilter* to remove duplicate data points with the same date and time.
+
+```{r, fig.height=6, fig.width=8}
+#| label: sdl_dup
+#| dependson: "sdl_musk"
+#| echo: TRUE
+#| warning: FALSE
+
+sdl_dup <- SDLfilter::dupfilter(sdl_musk, conditional = TRUE)
+```
+
+```{r}
+#| dependson: "sdl_dup"
+#| echo: FALSE
+#| warning: FALSE
+sdl_musk %>%
+  ## identify points that were identified as duplicates
+  mutate(
+    flag = ifelse(rowid %in% sdl_dup$rowid,"retained","removed"),
+    steplength_m = steplength_m + 1
+    ) %>%
+  ggplot(aes(x = DateTime, y = steplength_m)) +
+  geom_point(aes(colour = flag, size = flag)) +
+  scale_y_log10() +
+  facet_wrap(~id, scales = "free_x") +
+  scale_size_manual(values = c(1,0.5)) +
+  scale_colour_manual(values = c("red", "grey")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+Next we'll use *ddfilter* to filter points based on speed and turning angles between consecutive points. To use this function, we need to estimate the maximum reasonable speed between two consecutive locations. The *vmax* function maps a gamma distribution to the observed speeds and estimates the maximum speed as the value with a cumulative probability of 0.999.
+
+```{r}
+#| label: vmax
+#| dependson: "sdl_dup"
+#| echo: TRUE
+#| warning: FALSE
+
+vmax <- SDLfilter::vmax(sdl_dup, prob = 0.999)
+```
+We will also estimate the maximum one-way linear speed of a loop trip. A loop trip is defined as a spatial departure and return involving a series of three or more consecutive points. The *vmaxlp* function also uses a gamma distribution to estimate this speed:
+
+```{r}
+#| label: vmaxlp
+#| dependson: "vmax"
+#| echo: TRUE
+#| warning: FALSE
+
+vmaxlp <- SDLfilter::vmaxlp(sdl_dup, prob = 0.999)
+```
+
+Now we can filter our data using *ddfilter*. Locations are removed if one of following criteria are met: 1) speed from previous and to subsequent location both exceed **vmax**; 2) inner angle is less than a given threshold and speed from a previous or to a subsequent location exceeds **vmaxlp**. We will specify a turning angle of 14 degrees, as outlined in Bjørneraas et al. 2010.
+
+```{r, fig.height=6, fig.width=8}
+#| label: sdl_dd1
+#| dependson: "vmaxlp"
+#| echo: FALSE
+#| warning: FALSE
+
+sdl_dd1 <- SDLfilter::ddfilter(sdl_dup, qi = 5, 
+                              vmax = vmax, vmaxlp = vmaxlp,
+                              ia = 14)
+
+sdl_dup %>%
+  ## identify points that were identified as duplicates
+  mutate(
+    flag = ifelse(rowid %in% sdl_dd1$rowid,"retained","removed"),
+    steplength_m = steplength_m + 1
+    ) %>%
+  ggplot(aes(x = DateTime, y = steplength_m)) +
+  geom_point(aes(colour = flag, size = flag)) +
+  scale_y_log10() +
+  facet_wrap(~id, scales = "free_x") +
+  scale_size_manual(values = c(1,0.5)) +
+  scale_colour_manual(values = c("red", "grey")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+The filtered points appear non-randomly across the time series, which  suggests that our speed thresholds were too small. Let's increase **vmax** to a more conservative value of 2 km/h.
+
+```{r, fig.height=6, fig.width=8}
+#| label: sdl_dd2
+#| dependson: "vmaxlp"
+#| echo: FALSE
+#| warning: FALSE
+
+sdl_dd2 <- SDLfilter::ddfilter(sdl_dup, qi = 5, 
+                              vmax = 2, vmaxlp = vmaxlp,
+                              ia = 14)
+
+sdl_dup %>%
+  ## identify points that were indentified as duplicates
+  mutate(
+    flag = ifelse(rowid %in% sdl_dd2$rowid,"retained","removed"),
+    steplength_m = steplength_m + 1
+    ) %>%
+  ggplot(aes(x = DateTime, y = steplength_m)) +
+  geom_point(aes(colour = flag, size = flag)) +
+  scale_y_log10() +
+  facet_wrap(~id, scales = "free_x") +
+  scale_size_manual(values = c(1,0.5)) +
+  scale_colour_manual(values = c("red", "grey")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+```
+
+
+## Movement Trends
+
+Based on the step length time series above, movement distances tend to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997). Alternatively, this could be tied to the timing of snowmelt. We can explore this further by looking at average seasonal step lengths for each muskox:
+
+```{r}
+#| label: dist_seas
+#| dependson: "fix_data"
+#| echo: FALSE
+#| warning: FALSE
+
+musk_season <- musk_collar_fix %>%
+  ## add one to distances to allow 0s to be plotted on log scale
+  mutate(steplength_m = steplength_m + 1,
+         Season = case_when(
+           between(month, 3, 5) ~ "Spring",
+           between(month, 6, 8) ~ "Summer",
+           between(month, 9, 11) ~ "Autumn",
+           TRUE ~ "Winter"),
+         Season = factor(Season,
+                         levels = c("Winter", "Spring",
+                                    "Summer", "Autumn"))
+    )
+musk_season %>%
+  sf::st_drop_geometry() %>%
+  ggplot(aes(x = Season, y = steplength_m, fill = Id_Number)) +
+  geom_boxplot() +
+  scale_y_log10() +
+  theme_bw()
+```
+
+Step lengths in the winter and spring are similar, whereas autumn step lengths are intermediate between winter and summer. This again highlights the discrepancy between the gradual decrease in step lengths from summer to winter compared with the sharper increase from winter to summer.
+
+For the most part, average seasonal step lengths are consistent between muskoxen, though there appear to be greater variation in the spring and autumn. To examine this further, let's plot smoothed curves of step lengths against day of year for different years. We'll restrict this plot to muskoxen-year combinations with more than half a year's worth of data:
+
+```{r, fig.height=6, fig.width=8}
+#| label: dist_years
+#| dependson: "dist_seas"
+#| echo: FALSE
+#| warning: FALSE
+
+musk_season %>%
+  mutate(yday = yday(datetime)
+    ) %>%
+  group_by(Id_Number, year) %>%
+  filter(year %in% 2008:2011, n() > 365/2*3) %>%
+  ggplot(aes(x = yday, y = steplength_m, linetype = Id_Number,
+             colour = factor(year))) +
+  geom_smooth(method = "loess", se = FALSE) +
+  scale_y_log10() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        legend.key.width = unit(2,"cm"))
+```
+
+The greatest variation in step lengths appears to occur in the early spring. The curves of step lengths follow similar trajectories within the same year and variation in step lengths across years appears to be greater than variation in step lengths across muskoxen. In particular, step lengths from the late winter and early spring of 2011 are considerably shorter than those from the same time during other years.
+
+We can also look at net squared displacement curves to investigate movement patterns of muskoxen (i.e. resident, migratory, or nomadic).
+
+```{r}
+#| label: nsd
+#| dependson: "dist_seas"
+#| 
+```
+
+## Spatial Patterns
+
+```{r fig.height=6, fig.width=10}
+#| label: spat-plot
+#| dependson: dist_seas
+#| echo: FALSE
+#| warning: FALSE
+
+lc_2010_proj <- rast(here("data/processed/lc_2010_proj.tif"))
+nwt_names <-sf::st_read(here("data/raw/nwt_names/cgn_nt_shp_eng.shp"),
+                         quiet = TRUE) %>%
+  sf::st_transform(4326) %>%
+  sf::st_crop(lc_2010_proj) %>%
+  filter(GENERIC == "Town")
+
+musk_season %>%
+  ggplot() +
+  tidyterra::geom_spatraster(data = lc_2010_proj) +
+  geom_sf(aes(colour = Id_Number), shape = 21, stroke = 1,
+          fill = "white", alpha = 0.5) +  
+  geom_sf(data = nwt_names, size = 4, 
+          fill = "white", shape = 21,
+          stroke = 2) +
+  geom_sf_label(data = nwt_names, aes(label = GEONAME),
+                nudge_y = -0.08) +
+  theme_bw(10) +
+  theme(legend.box = "horizontal")
+
+
+```

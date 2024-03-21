@@ -20,6 +20,40 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -63,8 +97,8 @@ ul.task-list li input[type="checkbox"] {
 
 </header>
 
-<section id="data-exploration" class="level2">
-<h2 class="anchored" data-anchor-id="data-exploration">Data Exploration</h2>
+<section id="sample-size" class="level2">
+<h2 class="anchored" data-anchor-id="sample-size">Sample Size</h2>
 <p>Movement data for this project come from 10 female muskoxen in the Sahtu region of the Northwest Territories (NWT) that were collared between December 2007 and February 2012.</p>
 <p>We can plot the date ranges of individual collared muskoxen below:</p>
 <div class="cell" data-hash="data_exploration_cache/html/daterange_c1deb93fb2fa4920de9a459f8d33d25c">
@@ -135,20 +169,165 @@ ul.task-list li input[type="checkbox"] {
 </div>
 </div>
 <p>Muskoxen 707, 709, 710, and 7010 have less than a year of movement data and only 7011, 7012, and 7013 have more than 2 years of data.</p>
-<p>We can plot histograms of movement distances for each muskox:</p>
+</section>
+<section id="pre-processing" class="level2">
+<h2 class="anchored" data-anchor-id="pre-processing">Pre-processing</h2>
+<p>Before we look into the data, there are some data cleaning steps we can use to remove errors from that dataset. First, we know that collars 707, 709, and 710 had their release mechanisms triggered early, so we need to look at the data to figure out when this happened. Let’s start by looking at histograms of step lengths:</p>
 <div class="cell" data-hash="data_exploration_cache/html/dist_hist_e92ec7bf8d1c79ba48424d4dbb9c8066">
 <div class="cell-output-display">
 <p><img src="data_exploration_files/figure-html/dist_hist-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
-<p>The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For some muskoxen, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. Possible reasons include GPS malfunction, mortality, or dropped collars. We can explore this further by plotting the distances travelled with time:</p>
-<div class="cell" data-hash="data_exploration_cache/html/dist_time_b23a8f0d88c42be66bf8242bbc86f62b">
+<p>The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For collars 707, 709, and 710, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. By plotting time series of step lengths, we can can see that these negligible distances occur at the end of the recording periods:</p>
+<div class="cell" data-hash="data_exploration_cache/html/dist_time_f1252bdb48bf182507b80a0a2698f3cf">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/dist_time-1.png" class="img-fluid" width="672"></p>
+<p><img src="data_exploration_files/figure-html/dist_time-1.png" class="img-fluid" width="768"></p>
 </div>
 </div>
-<p>Muskoxen 707, 709, and 710 have extended periods of time at the end of their time series where the collar data suggest negligible movements.</p>
-<p>Movement distances tend to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997).</p>
+<p>For simplicity, let’s remove all points following the first two consecutive short step lengths (i.e.&nbsp;0 or 4.4747041) at the end of the time series.</p>
+<div class="cell" data-hash="data_exploration_cache/html/fix_data_d53dac154e7e9bb848ff0cb5ed41c090">
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Id_Number</th>
+<th style="text-align: right;">DaysRemoved</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">707</td>
+<td style="text-align: right;">108</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">709</td>
+<td style="text-align: right;">36</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">710</td>
+<td style="text-align: right;">19</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Now that we have removed data that we know contain errors, we can start to look for less obvious sources of errors. The SDLfilter package has two functions, <em>dupfilter</em> and <em>ddfilter,</em> that remove data duplicates and unlikely points, respectively.</p>
+<p>First let’s use <em>dupfilter</em> to remove duplicate data points with the same date and time.</p>
+<div class="cell" data-hash="data_exploration_cache/html/sdl_dup_ccabfc5453056b8c764c1aa77f16ed03">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>sdl_dup <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">dupfilter</span>(sdl_musk, <span class="at">conditional =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+dupfilter_exact removed 3 of 14065 locations
+dupfilter_qi removed 0 of 14062 locations
+dupfilter_time removed 21 of 14062 locations
+dupfilter_space removed 0 of 14041 locations
+
+Input data: 14065 locations
+Filtered data: 14041 locations
+dupfilter removed 24 locations (0.17% of original data)</code></pre>
+</div>
+</div>
+<div class="cell" data-hash="data_exploration_cache/html/unnamed-chunk-9_463f3506d41adf134e7618a284abc82e">
+<div class="cell-output-display">
+<p><img src="data_exploration_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Next we’ll use <em>ddfilter</em> to filter points based on speed and turning angles between consecutive points. To use this function, we need to estimate the maximum reasonable speed between two consecutive locations. The <em>vmax</em> function maps a gamma distribution to the observed speeds and estimates the maximum speed as the value with a cumulative probability of 0.99.</p>
+<div class="cell" data-hash="data_exploration_cache/html/vmax_cf53ac550fa3671ecdd78ee91a805f71">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>vmax <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">vmax</span>(sdl_dup, <span class="at">prob =</span> <span class="fl">0.999</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+dupfilter_exact removed 0 of 14041 locations
+dupfilter_qi removed 0 of 14041 locations
+dupfilter_time removed 0 of 14041 locations
+dupfilter_space removed 175 of 14041 locations
+
+Input data: 14041 locations
+Filtered data: 13866 locations
+dupfilter removed 175 locations (1.25% of original data)
+
+
+The maximum linear speed (Vmax) was estimated using 13852 locations.
+Vmax: 0.5141431 km/h</code></pre>
+</div>
+</div>
+<p>We will also estimate the maximum one-way linear speed of a loop trip. A loop trip is defined as a spatial departure and return involving a series of three or more consecutive points. The <em>vmaxlp</em> function also uses a gamma distribution to estimate this speed:</p>
+<div class="cell" data-hash="data_exploration_cache/html/vmaxlp_65c392b16c9ef64787e6605ca7e067e7">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>vmaxlp <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">vmaxlp</span>(sdl_dup, <span class="at">prob =</span> <span class="fl">0.999</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+dupfilter_exact removed 0 of 14041 locations
+dupfilter_qi removed 0 of 14041 locations
+dupfilter_time removed 0 of 14041 locations
+dupfilter_space removed 175 of 14041 locations
+
+Input data: 14041 locations
+Filtered data: 13866 locations
+dupfilter removed 175 locations (1.25% of original data)
+
+
+The maximum one-way linear speed of a loop trip (vmaxlp) was estimated using 
+179 Vlp from 90 loop trips.
+vmaxlp: 0.27 km/h</code></pre>
+</div>
+</div>
+<p>Now we can filter our data using <em>ddfilter</em>. Locations are removed if one of following criteria are met: 1) speed from previous and to subsequent location both exceed <strong>vmax</strong>; 2) inner angle is less than a given threshold and speed from a previous or to a subsequent location exceeds <strong>vmaxlp</strong>. We will specify a turning angle of 14 degrees, as outlined in Bjørneraas et al.&nbsp;2010.</p>
+<div class="cell" data-hash="data_exploration_cache/html/sdl_dd1_242953e6cde48bf7759de8dd300f9aab">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+ddfilter_speed removed 36 of 14041 locations
+ddfilter_loop removed 47 of 14005 locations
+
+Input data: 14041 locations
+Filtered data: 13958 locations
+ddfilter removed 83 locations (0.59% of original data)</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="data_exploration_files/figure-html/sdl_dd1-1.png" class="img-fluid" width="768"></p>
+</div>
+</div>
+<p>The filtered points appear non-randomly across the time series, which suggests that our speed thresholds were too small. Let’s increase <strong>vmax</strong> to a more conservative value of 2 km/h.</p>
+<div class="cell" data-hash="data_exploration_cache/html/sdl_dd2_90219eb5b58b07d1d560bbc070beaedc">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+ddfilter_speed removed 1 of 14041 locations
+ddfilter_loop removed 45 of 14040 locations
+
+Input data: 14041 locations
+Filtered data: 13995 locations
+ddfilter removed 46 locations (0.33% of original data)</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="data_exploration_files/figure-html/sdl_dd2-1.png" class="img-fluid" width="768"></p>
+</div>
+</div>
+<p>```</p>
+</section>
+<section id="movement-trends" class="level2">
+<h2 class="anchored" data-anchor-id="movement-trends">Movement Trends</h2>
+<p>Based on the step length time series above, movement distances tend to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997). Alternatively, this could be tied to the timing of snowmelt. We can explore this further by looking at average seasonal step lengths for each muskox:</p>
+<div class="cell" data-hash="data_exploration_cache/html/dist_seas_f46f37c599e71f457e8c6adc58262fab">
+<div class="cell-output-display">
+<p><img src="data_exploration_files/figure-html/dist_seas-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Step lengths in the winter and spring are similar, whereas autumn step lengths are intermediate between winter and summer. This again highlights the discrepancy between the gradual decrease in step lengths from summer to winter compared with the sharper increase from winter to summer.</p>
+<p>For the most part, average seasonal step lengths are consistent between muskoxen, though there appear to be greater variation in the spring and autumn. To examine this further, let’s plot smoothed curves of step lengths against day of year for different years. We’ll restrict this plot to muskoxen-year combinations with more than half a year’s worth of data:</p>
+<div class="cell" data-hash="data_exploration_cache/html/dist_years_5cb5787ab358ce7f54c9c5f5456cdc68">
+<div class="cell-output-display">
+<p><img src="data_exploration_files/figure-html/dist_years-1.png" class="img-fluid" width="768"></p>
+</div>
+</div>
+<p>The greatest variation in step lengths appears to occur in the early spring. The curves of step lengths follow similar trajectories within the same year and variation in step lengths across years appears to be greater than variation in step lengths across muskoxen. In particular, step lengths from the late winter and early spring of 2011 are considerably shorter than those from the same time during other years.</p>
+<p>We can also look at net squared displacement curves to investigate movement patterns of muskoxen (i.e.&nbsp;resident, migratory, or nomadic).</p>
+</section>
+<section id="spatial-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="spatial-patterns">Spatial Patterns</h2>
+<div class="cell" data-hash="data_exploration_cache/html/spat-plot_02019946b86aa119665773384b794fa0">
+<div class="cell-output-display">
+<p><img src="data_exploration_files/figure-html/spat-plot-1.png" class="img-fluid" width="960"></p>
+</div>
+</div>
 </section>
 
 </main>

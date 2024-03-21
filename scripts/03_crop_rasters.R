@@ -29,14 +29,20 @@ lc_2010 <- terra::rast("data/raw/landcover/landcover-2010-classification.tif")
 ### buffer collar data 1km
 buffer <- musk_collar %>%
   sf::st_transform(terra::crs(lc_2010)) %>%
-  sf::st_buffer(dist = 10000)
+  sf::st_buffer(dist = 100000)
 
 ### crop land cover data to collar data buffer
 lc_2010_crop <- terra::crop(lc_2010, buffer) %>%
   ### change numeric values to land classification
   subst(lc_atts$Value,lc_atts$Classification) 
 
-saveRDS(lc_2010_crop, "data/processed/lc_2010_crop.rds")
+## now project land cover to same crs as location data for plotting
+lc_2010_proj <- lc_2010_crop %>%
+  terra::project(y = "epsg:4326") %>%
+  terra::crop(musk_season %>% sf::st_buffer(dist = 10000))
+
+writeRaster(lc_2010_crop, "data/processed/lc_2010_crop.tif")
+writeRaster(lc_2010_proj, "data/processed/lc_2010_proj.tif")
 
 
   

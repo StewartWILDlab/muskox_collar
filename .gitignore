@@ -3,6 +3,4 @@
 .RData
 .Ruserdata
 *.tif
-data/raw/*
-data/processed/*
-output/*
+scripts/data_exploration_cache/
