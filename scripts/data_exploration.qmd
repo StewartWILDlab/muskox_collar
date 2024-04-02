@@ -151,7 +151,7 @@ First let's use *dupfilter* to remove duplicate data points with the same date a
 #| warning: FALSE
 
 sdl_dup <- SDLfilter::dupfilter(sdl_musk, 
-                                step.time = 1,
+                                step.time = 7,
                                 conditional = TRUE)
 ```
 
@@ -214,7 +214,7 @@ The filtered points appear non-randomly across the time series, which  suggests 
 
 ```{r}
 #| label: sdl_dd2
-#| dependson: "vmaxlp"
+#| dependson: "sdl_dup"
 #| echo: TRUE
 #| warning: FALSE
 
@@ -263,6 +263,7 @@ deploy <- read_csv(here("data/raw/muskox_data/musk_collar_deployments.csv"), sho
 
 deploy %>%
   select(Id_Number, datetime) %>%
+  rename(collar_deployed = datetime) %>%
   knitr::kable()
 
 musk_collar_filt <- musk_collar_fix %>%
@@ -272,8 +273,8 @@ musk_collar_filt <- musk_collar_fix %>%
             by = c("Id_Number")) %>%
   ## filter out observations within the 24 hour window following deployment
   filter(datetime > date_filter) %>%
-  select(Id_Number, Latitude, Longitude, datetime, pTime, pDist,
-         pSpeed, geometry)
+  select(Id_Number, Latitude, Longitude, datetime, year, month,
+         pTime, pDist, pSpeed, geometry)
 
 saveRDS(musk_collar_filt, here("data/processed/musk_collar_filt.rds"))
 ```

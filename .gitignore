@@ -4,3 +4,7 @@
 .Ruserdata
 *.tif
 scripts/data_exploration_cache/
+scripts/data_exploration_files/
+scripts/movement_patterns_cache/
+scripts/movement_patterns_files/
+*.html
