@@ -10,6 +10,7 @@ execute:
 #| label: load-packages
 #| include: false
 
+library(adehabitatLT)
 library(tidyverse)
 library(sf)
 library(terra)
@@ -44,11 +45,12 @@ musk_collar_filt %>%
                          levels = c("Winter", "Spring",
                                     "Summer", "Autumn"))
     ) %>%
-  ggplot(aes(x = datetime, y = pSpeed*1000+1)) +
+  filter(pTime == 8) %>%
+  ggplot(aes(x = datetime, y = pDist + 0.01)) +
   geom_point(aes(colour = Season), size = 0.5) +
   geom_smooth(method = "loess", span = 0.25, alpha = 0.5) +
   scale_y_log10() +
-  ylab("Speed (m/h)") +
+  ylab("Step length (km)") +
   facet_wrap(~Id_Number, scales = "free_x") +
   scale_colour_manual(values = c("lightblue3","springgreen","yellow2","orange")) +
   theme_bw() +
@@ -76,10 +78,10 @@ musk_season <- musk_collar_filt %>%
     )
 musk_season %>%
   sf::st_drop_geometry() %>%
-  ggplot(aes(x = Season, y = pSpeed*1000+1, fill = Id_Number)) +
-  geom_boxplot() +
-  ylab("Speed (m/h)") +
-  scale_y_log10() +
+  filter(pTime == 8) %>%
+  ggplot(aes(x = Season, y = pDist, fill = Id_Number)) +
+  geom_boxplot(outliers = FALSE) +
+  ylab("Step length (km)") +
   theme_bw()
 ```
 
@@ -97,20 +99,22 @@ musk_season %>%
   mutate(yday = yday(datetime)
     ) %>%
   group_by(Id_Number, year) %>%
-  filter(year %in% 2008:2011, n() > 365/2*3) %>%
-  ggplot(aes(x = yday, y = pSpeed*1000+1, linetype = Id_Number,
-             colour = factor(year))) +
+  filter(year %in% 2008:2011, 
+         n() > 365/2*3,
+         pTime == 8) %>%
+  ggplot(aes(x = yday, y = pDist,
+             colour = Id_Number)) +
   geom_smooth(method = "loess", se = FALSE) +
-  ylab("Speed (m/h)") +
-  scale_y_log10() +
+  facet_wrap(~year) +
+  ylab("Step length (km)") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
         legend.key.width = unit(2,"cm"))
 ```
 
-The greatest variation in step lengths appears to occur in the early spring. The curves of step lengths follow similar trajectories within the same year and variation in step lengths across years appears to be greater than variation in step lengths across muskoxen. In particular, step lengths from the late winter and early spring of 2011 are considerably shorter than those from the same time during other years.
+The curves of step lengths follow similar trajectories but there is still considerable variation across years and among muskoxen. This suggests weather, landscape, and muskox characteristics may play a part in influencing movement behaviour.
 
-Movement patterns in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the early spring to investigate how approximate calving dates impact movement. 
+Movement behaviour in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the spring to investigate how approximate calving dates impact movement. 
 
 ```{r, fig.height=6, fig.width=8}
 #| label: dist_calf
@@ -118,30 +122,56 @@ Movement patterns in spring may be related to calving. Previous studies in Green
 #| echo: FALSE
 #| warning: FALSE
 
+### load muskox calf observations
 musk_calf <- read_csv(here("data/raw/muskox_data/musk_calf_surveys.csv"), show_col_types = FALSE) %>%
   mutate(Id_Number = as.factor(Id_Number),
          year = lubridate::year(Date)) %>%
-  arrange(Date) %>%
   select(Id_Number, year, Date, with_calf)
 
-temp <- musk_season %>%
+### fill in missing dates for plotting
+musk_calf_exp <- musk_calf %>%
+  group_by(Id_Number, year, Date) %>% 
+  group_modify(~ add_row(.x,.before=0)) %>%
+  mutate(Date = data.table::fifelse(!is.na(with_calf),Date,Date+1)) %>%
+  group_by(Id_Number, year) %>%
+  group_modify(~ add_row(.x,.before=0)) %>%
+  mutate(Date = data.table::fifelse(!is.na(Date),Date,as.Date(str_c(year,"-03-01")))) %>%
+  arrange(Date) %>%
+  mutate(with_calf = case_when(
+    !is.na(with_calf) ~ with_calf,
+    lead(with_calf) == "no" ~ "no",
+    lag(with_calf) == "yes" ~ "yes",
+    lag(with_calf) == "no" & lead(with_calf) == "yes" ~ "unknown",
+    lag(with_calf) == "no" ~ "unknown",
+    lead(with_calf) == "yes" ~ "unknown"
+  )) %>%
+  complete(Date = seq.Date(as.Date("2008-03-01"),as.Date("2008-07-30"), by="day")) %>%
+  complete(Date = seq.Date(as.Date("2009-03-01"),as.Date("2009-07-30"), by="day")) %>%
+  filter(lubridate::year(Date)==year) %>%
+  fill(with_calf, .direction = "downup")
+
+musk_season %>%
   mutate(yday = yday(datetime)) %>%
   group_by(Id_Number, year) %>%
-  filter(month %in% 4:6, pTime == 8, year %in% 2008:2009) %>%
-  filter(n()>25*3) %>%
-  left_join(musk_calf, by = c("Id_Number", "year")) %>%
-  group_by(Id_Number, datetime) %>%
-  filter(datetime > Date & )
-  ggplot(aes(x = yday, y = pDist)) +
+  filter(month %in% 3:6, pTime == 8, year %in% 2008:2009,
+         !(Id_Number %in% c(709,710))) %>%
+  mutate(Date = as.Date(datetime)) %>%
+  left_join(musk_calf_exp, by = c("Id_Number", "year", "Date")) %>%
+  ggplot(aes(x = datetime, y = pDist, colour = with_calf, group = Id_Number)) +
   geom_line() +
-  facet_wrap(~year+Id_Number) +
-  scale_y_log10() +
+  geom_point(data = musk_calf %>% filter(lubridate::month(Date) %in% 3:6,
+                                         !(Id_Number %in% c(709,710))),
+             aes(x = as.POSIXct(Date), y = 0), colour = "black") +
+  coord_cartesian(ylim=c(0,1.5)) +
+  facet_wrap(~year+Id_Number, scales = "free_x") +
+  scale_colour_manual(values = c("red", "grey", "blue")) +
   ylab("Step length (km)") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
         legend.key.width = unit(2,"cm"))
 ```
-```
+
+Comparing the graphs of muskoxen that were observed to be accompanied by a calf to those that were not, there does not appear to be a major difference in the general trend for step lengths. 7013 in 2009 is the only trajectory to show a sudden decrease in step lengths that resembles those used to determine calving dates for caribou (Bonar et al., 2018; DeMars et al., 2013), but this signal is not present for any of the other muskoxen. For most muskoxen, there is a marked increase in step length in mid-May, but this does not appear to be related to calving dates. The survey data shows that in almost all spring surveys (April onwards), the collared muskoxen were in groups consisting of other females with calves. Only 7010 in 2009 was in a group that wasn't observed to contain calves until the June survey. I am not sure if these observations
 
 
 ## Net Squared Displacement
@@ -164,7 +194,7 @@ xy <- musk_collar_sub %>%
   sf::st_coordinates()
 ltraj <- adehabitatLT::as.ltraj(xy = xy, date = musk_collar_sub$datetime, id = musk_collar_sub$Id_Number)
 
-ld(ltraj) %>%
+adehabitatLT::ld(ltraj) %>%
   ggplot(aes(x = date, y = R2n)) +
   geom_point(size = 0.5) +
   geom_line() +
@@ -227,7 +257,6 @@ We now have trajectories for 7 collared muskoxen split across 16 bursts. We will
 #| echo: FALSE
 #| warning: FALSE
 
-library(adehabitatLT)
 rloc <- migrateR::findrloc(ltraj_burst)
 nsd_mod <- migrateR::mvmtClass(ltraj_burst, rloc = rloc$rloc)
 migrateR::plot.mvmts(nsd_mod)
