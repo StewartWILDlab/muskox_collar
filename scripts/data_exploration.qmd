@@ -273,10 +273,15 @@ musk_collar_filt <- musk_collar_fix %>%
             by = c("Id_Number")) %>%
   ## filter out observations within the 24 hour window following deployment
   filter(datetime > date_filter) %>%
-  select(Id_Number, Latitude, Longitude, datetime, year, month,
+  select(Id_Number, PTT, Latitude, Longitude, datetime, year, month,
          pTime, pDist, pSpeed, geometry)
 
 saveRDS(musk_collar_filt, here("data/processed/musk_collar_filt.rds"))
+
+### convert file to csv for MoveBank 
+musk_collar_filt %>%
+  sf::st_drop_geometry() %>%
+  write_csv(here("data/processed/musk_collar_filt.csv"))
 ```
 
 

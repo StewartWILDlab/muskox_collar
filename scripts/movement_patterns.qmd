@@ -10,7 +10,6 @@ execute:
 #| label: load-packages
 #| include: false
 
-library(adehabitatLT)
 library(tidyverse)
 library(sf)
 library(terra)
@@ -204,63 +203,8 @@ adehabitatLT::ld(ltraj) %>%
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
-The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviiour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area. 
+The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area. 
 
-To model movement behaviours in the **migrateR** package, we first need to split up these time series into different bursts that represent approximately a years worth of data. Large gaps and time series that are longer or much shorter than a year can make movement models difficult to fit. To deal with gaps in the trajectories, we can plot the number of days between successive observations:
-
-```{r, fig.height=10, fig.width=8}
-#| label: plot_dt
-#| dependson: "musk_ltraj"
-#| echo: FALSE
-#| warning: FALSE
- 
-adehabitatLT::plotltr(ltraj, "dt/3600/24")
-```
-
-We can see there are a few instances where the gap between successive observations exceeds 10 days. Let's split the time series into different bursts for each collared animal. 
-
-
-```{r, fig.height=10, fig.width=8}
-#| label: ltraj_burst
-#| dependson: "ltraj"
-#| echo: FALSE
-#| warning: FALSE
-
-### split trajectories when number of days between points is >10 days
-ltraj_burst <- adehabitatLT::cutltraj(ltraj, "dt> (10*3600*24)", 
-                        nextr = TRUE)
-musk_burst <- adehabitatLT::ld(ltraj_burst) %>%
-  group_by(burst) %>%
-  ## split bursts by years of data
-  mutate(day = (date - min(date))/(3600*24),
-         burst = case_when(
-           day <= 365 ~ str_c(burst,0),
-           day <= 365*2 ~ str_c(burst,1),
-           day <= 365*3 ~ str_c(burst,2),
-           day <= 365*4 ~ str_c(burst,3)
-         )) %>%
-  ## remove bursts with less than 10 days of data
-  filter(n() > 100) %>%
-  as.data.frame()
-
-ltraj_burst <- adehabitatLT::dl(musk_burst)  
-
-ltraj_burst
-
-```
-
-We now have trajectories for 7 collared muskoxen split across 16 bursts. We will now use the **migrateR** package to fit a set of pre-defined movement models to each burst. 
-
-```{r, fig.height=3}
-#| label: nsd_mod
-#| dependson: "ltraj_burst"
-#| echo: FALSE
-#| warning: FALSE
-
-rloc <- migrateR::findrloc(ltraj_burst)
-nsd_mod <- migrateR::mvmtClass(ltraj_burst, rloc = rloc$rloc)
-migrateR::plot.mvmts(nsd_mod)
-```
 
 
 
