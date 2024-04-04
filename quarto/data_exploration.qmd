@@ -1,6 +1,5 @@
 ---
 title: "Muskox Collar Data Cleaning"
-format: html
 editor: visual
 execute: 
   cache: TRUE
@@ -165,6 +164,7 @@ Next we'll use *ddfilter* to filter points based on speed and turning angles bet
 
 vmax <- SDLfilter::vmax(sdl_dup, prob = 0.999)
 ```
+
 We will also estimate the maximum one-way linear speed of a loop trip. A loop trip is defined as a spatial departure and return involving a series of three or more consecutive points. The *vmaxlp* function also uses a gamma distribution to estimate this speed:
 
 ```{r}
@@ -210,7 +210,7 @@ sdl_dup %>%
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
-The filtered points appear non-randomly across the time series, which  suggests that our speed thresholds were too small. Let's increase **vmax** and **vmaxlp** to more conservative values of 2 km/h and 1 km/h, respectively.
+The filtered points appear non-randomly across the time series, which suggests that our speed thresholds were too small. Let's increase **vmax** and **vmaxlp** to more conservative values of 2 km/h and 1 km/h, respectively.
 
 ```{r}
 #| label: sdl_dd2
@@ -243,7 +243,8 @@ sdl_dup %>%
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
-That seems to do a better job of only removing the most extreme points. 
+
+That seems to do a better job of only removing the most extreme points.
 
 ## Post-deployment Bias
 
@@ -283,5 +284,3 @@ musk_collar_filt %>%
   sf::st_drop_geometry() %>%
   write_csv(here("data/processed/musk_collar_filt.csv"))
 ```
-
-

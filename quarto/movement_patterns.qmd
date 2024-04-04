@@ -1,6 +1,5 @@
 ---
 title: "Muskox Movement Patterns"
-format: html
 editor: visual
 editor_options: 
   chunk_output_type: console
@@ -113,7 +112,7 @@ musk_season %>%
 
 The curves of step lengths follow similar trajectories but there is still considerable variation across years and among muskoxen. This suggests weather, landscape, and muskox characteristics may play a part in influencing movement behaviour.
 
-Movement behaviour in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the spring to investigate how approximate calving dates impact movement. 
+Movement behaviour in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the spring to investigate how approximate calving dates impact movement.
 
 ```{r, fig.height=6, fig.width=8}
 #| label: dist_calf
@@ -172,12 +171,11 @@ musk_season %>%
 
 Comparing the graphs of muskoxen that were observed to be accompanied by a calf to those that were not, there does not appear to be a major difference in the general trend for step lengths. 7013 in 2009 is the only trajectory to show a sudden decrease in step lengths that resembles those used to determine calving dates for caribou (Bonar et al., 2018; DeMars et al., 2013), but this signal is not present for any of the other muskoxen. For most muskoxen, there is a marked increase in step length in mid-May, but this does not appear to be related to calving dates. The survey data shows that in almost all spring surveys (April onwards), the collared muskoxen were in groups consisting of other females with calves. Only 7010 in 2009 was in a group that wasn't observed to contain calves until the June survey. I am not sure if these observations
 
-
 ## Net Squared Displacement
 
 We can also look at net squared displacement curves to investigate movement patterns of muskoxen (i.e. resident, migratory, or nomadic). See Bunnefeld et al. (2011) for examples of how these curves look for different movement classes (i.e. migrant, disperser, resident, nomad).
 
-To do this we will use the **adehabitatLT** package to format our data and the **migrateR** package to fit different models to the net displacement data. Let's first get our collar data into the trajectory format used by adehabitatLT. We will also subset our data to one observation per day to improve modelling efficiency. 
+To do this we will use the **adehabitatLT** package to format our data and the **migrateR** package to fit different models to the net displacement data. Let's first get our collar data into the trajectory format used by adehabitatLT. We will also subset our data to one observation per day to improve modelling efficiency.
 
 ```{r, fig.height=6, fig.width=8}
 #| label: musk_ltraj
@@ -203,7 +201,7 @@ adehabitatLT::ld(ltraj) %>%
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
-The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area. 
+The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area.
 
 ## Spatial Patterns
 
