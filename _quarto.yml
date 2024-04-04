@@ -6,9 +6,7 @@ execute:
   cache: TRUE
 website: 
   title: "NWT Muskox Collar Project"
-  sidebar:
-    style: "docked"
-    search: false
-    contents: 
-      - data_exploration.qmd
-      - movement_patterns.qmd
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
