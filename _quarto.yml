@@ -10,3 +10,5 @@ website:
     left:
       - href: index.qmd
         text: Home
+      - data_exploration.qmd
+      - movement_patterns.qmd
