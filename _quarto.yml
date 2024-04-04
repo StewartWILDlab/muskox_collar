@@ -1,6 +1,7 @@
 project:
   title: "Project title"
-  output-dir: output
+  output-dir: docs
+  type: website
 format:  html
 execute: 
   cache: TRUE
