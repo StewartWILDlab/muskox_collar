@@ -1,0 +1,6 @@
+project:
+  title: "Project title"
+  output-dir: output
+format:  html
+execute: 
+  cache: TRUE

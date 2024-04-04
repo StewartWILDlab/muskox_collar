@@ -9,3 +9,4 @@ scripts/movement_patterns_cache/
 scripts/movement_patterns_files/
 *.html
 scripts/nul
+/.quarto/

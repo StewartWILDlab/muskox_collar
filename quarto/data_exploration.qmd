@@ -278,7 +278,7 @@ musk_collar_filt <- musk_collar_fix %>%
 
 saveRDS(musk_collar_filt, here("data/processed/musk_collar_filt.rds"))
 
-### convert file to csv for MoveBank 
+### convert file to csv for MoveBank  
 musk_collar_filt %>%
   sf::st_drop_geometry() %>%
   write_csv(here("data/processed/musk_collar_filt.csv"))

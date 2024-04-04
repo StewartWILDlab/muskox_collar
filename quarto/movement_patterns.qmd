@@ -2,8 +2,8 @@
 title: "Muskox Movement Patterns"
 format: html
 editor: visual
-execute: 
-  cache: TRUE
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -204,11 +204,6 @@ adehabitatLT::ld(ltraj) %>%
 ```
 
 The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area. 
-
-
-
-
-
 
 ## Spatial Patterns
 
