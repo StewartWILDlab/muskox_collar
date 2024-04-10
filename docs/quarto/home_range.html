@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>NWT Muskox Collar Project - Movement Patterns</title>
+<title>NWT Muskox Collar Project - Home Range</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -106,7 +106,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/movement_patterns.html">Movement Patterns</a></li></ol></nav>
+      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/home_range.html">Home Range</a></li></ol></nav>
       <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
       </a>
     </div>
@@ -131,13 +131,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/movement_patterns.html" class="sidebar-item-text sidebar-link active">
+  <a href="../quarto/movement_patterns.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Movement Patterns</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/home_range.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/home_range.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">Home Range</span></a>
   </div>
 </li>
@@ -152,7 +152,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Movement Patterns</h1>
+<h1 class="title">Home Range</h1>
 </div>
 
 
@@ -167,70 +167,81 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 </header>
 
-<p>In this document, we will examine patterns in the movement behaviours of collared muskoxen. We will use muskox speed and turning angles to explore behaviour.</p>
-<section id="movement-trends" class="level2">
-<h2 class="anchored" data-anchor-id="movement-trends">Movement Trends</h2>
-<div class="cell" data-hash="movement_patterns_cache/html/dist_time_632e1c940ead8c64d82ae2f9cb29c16d">
+<p>In this document, we will estimate home range size for collared muskoxen and look to compare range overlap and size across years and seasons.</p>
+<section id="estimating-movement-model" class="level2">
+<h2 class="anchored" data-anchor-id="estimating-movement-model">Estimating Movement Model</h2>
+<p>Before we can estimate home ranges for the collared muskoxen, we need to determine an appropriate movement model. To do this, we will use variograms. Our data has been updated to conform to Movebank naming conventions so that we can use the <strong>ctmm</strong> package.</p>
+<div class="cell" data-hash="home_range_cache/html/load-data_7ee1fd43b6f0f43daa2db7c83659f5d1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ctmm)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>musk_move <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">"data/raw/muskox_data/musk_collar_filt_movebank.csv"</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>musk_tel <span class="ot">&lt;-</span> <span class="fu">as.telemetry</span>(musk_move)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>First we will plot empirical variograms for each collared muskoxen. Variograms are used to quantify spatial dependence between locations at different points in time. In general, as the time between locations increases, spatial dependence decreases. Variograms plot the semi-variance of distances between pairs of points separated by different time lags. At short time lags, these distances are very similar and the semi-variance is low. At large time lags, there is greater variability in the distances between points, so the semi-variance is high. Usually variograms will reach an asymptote in semi-variance that represents the time lag at which the animal is able to traverse their home range.</p>
+<div class="cell" data-hash="home_range_cache/html/musk_var_8b369e6198e5520d23189dc127f3a597">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_var <span class="ot">&lt;-</span> <span class="fu">lapply</span>(musk_tel, variogram)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(musk_var)){<span class="fu">plot</span>(musk_var[i]);<span class="fu">print</span>(musk_var[[i]]<span class="sc">@</span>info<span class="sc">$</span>identity)}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
-<p><img src="movement_patterns_files/figure-html/dist_time-1.png" class="img-fluid" width="768"></p>
+<p><img src="home_range_files/figure-html/musk_var-1.png" class="img-fluid" width="672"></p>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "706"</code></pre>
 </div>
-<p>Based on the time series above, movement tends to be highest in the summer (June, July, August), gradually decrease during autumn (September, October, November) and winter (December, January, February) and experience a sharp increase in the late spring (May). Perhaps this increase is timed with parturition, which has been found to start in April/May (Adamczewski 1997). Alternatively, this could be tied to the timing of snowmelt. We can explore this further by looking at average seasonal step lengths for each muskox:</p>
-<div class="cell" data-hash="movement_patterns_cache/html/dist_seas_fa235010dfe24cabed7dfaf30d66821f">
 <div class="cell-output-display">
-<p><img src="movement_patterns_files/figure-html/dist_seas-1.png" class="img-fluid" width="672"></p>
+<p><img src="home_range_files/figure-html/musk_var-2.png" class="img-fluid" width="672"></p>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "707"</code></pre>
 </div>
-<p>Step lengths in the winter and spring are similar, whereas autumn step lengths are intermediate between winter and summer. This again highlights the discrepancy between the gradual decrease in step lengths from summer to winter compared with the sharper increase from winter to summer.</p>
-<p>For the most part, average seasonal step lengths are consistent between muskoxen, though there appear to be greater variation in the spring and autumn. To examine this further, let’s plot smoothed curves of step lengths against day of year for different years. We’ll restrict this plot to muskoxen-year combinations with more than half a year’s worth of data:</p>
-<div class="cell" data-hash="movement_patterns_cache/html/dist_years_26e374717380e3d8a3f84bd4170b46ea">
 <div class="cell-output-display">
-<p><img src="movement_patterns_files/figure-html/dist_years-1.png" class="img-fluid" width="768"></p>
+<p><img src="home_range_files/figure-html/musk_var-3.png" class="img-fluid" width="672"></p>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "708"</code></pre>
 </div>
-<p>The curves of step lengths follow similar trajectories but there is still considerable variation across years and among muskoxen. This suggests weather, landscape, and muskox characteristics may play a part in influencing movement behaviour.</p>
-<p>Movement behaviour in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the spring to investigate how approximate calving dates impact movement.</p>
-<div class="cell" data-hash="movement_patterns_cache/html/dist_calf_78ba84d7713ad54b507237771e34b44a">
 <div class="cell-output-display">
-<p><img src="movement_patterns_files/figure-html/dist_calf-1.png" class="img-fluid" width="768"></p>
+<p><img src="home_range_files/figure-html/musk_var-4.png" class="img-fluid" width="672"></p>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "709"</code></pre>
 </div>
-<p>Comparing the graphs of muskoxen that were observed to be accompanied by a calf to those that were not, there does not appear to be a major difference in the general trend for step lengths. 7013 in 2009 is the only trajectory to show a sudden decrease in step lengths that resembles those used to determine calving dates for caribou (Bonar et al., 2018; DeMars et al., 2013), but this signal is not present for any of the other muskoxen. For most muskoxen, there is a marked increase in step length in mid-May, but this does not appear to be related to calving dates. The survey data shows that in almost all spring surveys (April onwards), the collared muskoxen were in groups consisting of other females with calves. Only 7010 in 2009 was in a group that wasn’t observed to contain calves until the June survey. I am not sure if these observations</p>
-</section>
-<section id="net-squared-displacement" class="level2">
-<h2 class="anchored" data-anchor-id="net-squared-displacement">Net Squared Displacement</h2>
-<p>We can also look at net squared displacement curves to investigate movement patterns of muskoxen (i.e.&nbsp;resident, migratory, or nomadic). See Bunnefeld et al.&nbsp;(2011) for examples of how these curves look for different movement classes (i.e.&nbsp;migrant, disperser, resident, nomad).</p>
-<p>To do this we will use the <strong>adehabitatLT</strong> package to format our data and the <strong>migrateR</strong> package to fit different models to the net displacement data. Let’s first get our collar data into the trajectory format used by adehabitatLT. We will also subset our data to one observation per day to improve modelling efficiency.</p>
-<div class="cell" data-hash="movement_patterns_cache/html/musk_ltraj_b6d2f70dcc9f94ef062c054d804b6bcb">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>musk_collar_sub <span class="ot">&lt;-</span> musk_collar_filt <span class="sc">%&gt;%</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(lubridate<span class="sc">::</span><span class="fu">hour</span>(datetime) <span class="sc">==</span> <span class="dv">16</span>)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> musk_collar_sub <span class="sc">%&gt;%</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_coordinates</span>()</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>ltraj <span class="ot">&lt;-</span> adehabitatLT<span class="sc">::</span><span class="fu">as.ltraj</span>(<span class="at">xy =</span> xy, <span class="at">date =</span> musk_collar_sub<span class="sc">$</span>datetime, <span class="at">id =</span> musk_collar_sub<span class="sc">$</span>Id_Number)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>adehabitatLT<span class="sc">::</span><span class="fu">ld</span>(ltraj) <span class="sc">%&gt;%</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> date, <span class="at">y =</span> R2n)) <span class="sc">+</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() <span class="sc">+</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ylab</span>(<span class="st">"Net squared displacement (km^2)"</span>) <span class="sc">+</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>id, <span class="at">scales =</span> <span class="st">"free"</span>) <span class="sc">+</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>() <span class="sc">+</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">vjust =</span> <span class="dv">1</span>, <span class="at">hjust=</span><span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
-<p><img src="movement_patterns_files/figure-html/musk_ltraj-1.png" class="img-fluid" width="768"></p>
+<p><img src="home_range_files/figure-html/musk_var-5.png" class="img-fluid" width="672"></p>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "710"</code></pre>
 </div>
-<p>The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area.</p>
-</section>
-<section id="spatial-patterns" class="level2">
-<h2 class="anchored" data-anchor-id="spatial-patterns">Spatial Patterns</h2>
-<div class="cell" data-hash="movement_patterns_cache/html/spat-plot_f4cb3c5252a80c9c42697a14c79b37cf">
 <div class="cell-output-display">
-<p><img src="movement_patterns_files/figure-html/spat-plot-1.png" class="img-fluid" width="960"></p>
+<p><img src="home_range_files/figure-html/musk_var-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "7010"</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="home_range_files/figure-html/musk_var-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "7011"</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="home_range_files/figure-html/musk_var-8.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "7012"</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="home_range_files/figure-html/musk_var-9.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "7013"</code></pre>
+</div>
+<div class="cell-output-display">
+<p><img src="home_range_files/figure-html/musk_var-10.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "7080"</code></pre>
 </div>
 </div>
+<p>Most of these look fine, but it is clear there are some issues with</p>
 
 
 </section>

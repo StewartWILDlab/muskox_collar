@@ -1,0 +1,49 @@
+---
+title: "Home Range"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+execute:
+  echo: true
+  warning: false
+  error: false
+---
+
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(sf)
+library(here)
+```
+
+
+In this document, we will estimate home range size for collared muskoxen and look to compare range overlap and size across years and seasons.
+
+## Estimating Movement Model
+
+Before we can estimate home ranges for the collared muskoxen, we need to determine an appropriate movement model. To do this, we will use variograms. Our data has been updated to conform to Movebank naming conventions so that we can use the **ctmm** package.
+
+```{r}
+#| label: load-data
+
+library(ctmm)
+musk_move <- read.csv(here("data/raw/muskox_data/musk_collar_filt_movebank.csv"))
+musk_tel <- as.telemetry(musk_move)
+
+```
+
+First we will plot empirical variograms for each collared muskoxen. Variograms are used to quantify spatial dependence between locations at different points in time. In general, as the time between locations increases, spatial dependence decreases. Variograms plot the semi-variance of distances between pairs of points separated by different time lags. At short time lags, these distances are very similar and the semi-variance is low. At large time lags, there is greater variability in the distances between points, so the semi-variance is high. Usually variograms will reach an asymptote in semi-variance that represents the time lag at which the animal is able to traverse their home range. 
+
+```{r, fig.height=4}
+#| label: musk_var
+#| dependson: "load-data"
+
+musk_var <- lapply(musk_tel, variogram)
+for (i in 1:length(musk_var)){plot(musk_var[i]);print(musk_var[[i]]@info$identity)}
+```
+
+Most of these look fine, but it is clear there are some issues with 

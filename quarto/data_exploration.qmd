@@ -1,5 +1,5 @@
 ---
-title: "Muskox Collar Data Cleaning"
+title: "Data Cleaning"
 editor: visual
 execute: 
   cache: TRUE

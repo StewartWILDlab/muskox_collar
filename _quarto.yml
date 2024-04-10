@@ -12,3 +12,4 @@ website:
     contents: 
       - quarto/data_exploration.qmd
       - quarto/movement_patterns.qmd
+      - quarto/home_range.qmd
