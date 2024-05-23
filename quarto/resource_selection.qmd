@@ -1,0 +1,128 @@
+---
+title: "Resource selection"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(sf)
+library(terra)
+library(here)
+```
+
+```{r}
+#| label: load-data
+#| include: false
+
+musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
+lc_2010_proj <- rast(here("data/processed/lc_2010_proj.tif"))
+```
+
+## Spatial Patterns
+
+```{r fig.height=6, fig.width=10}
+#| label: spat-plot
+#| dependson: dist_seas
+#| echo: FALSE
+#| warning: FALSE
+
+lc_2010_proj <- rast(here("data/processed/lc_2010_proj.tif"))
+lc_atts <- readRDS(here("data/processed/lc_atts.rds"))
+cols <- as.character(lc_atts$hex)
+names(cols) <- as.character(lc_atts$Classification)
+nwt_names <-sf::st_read(here("data/raw/nwt_names/cgn_nt_shp_eng.shp"),
+                         quiet = TRUE) %>%
+  sf::st_transform(4326) %>%
+  sf::st_crop(lc_2010_proj) %>%
+  filter(GENERIC == "Town")
+
+musk_collar_filt %>%
+  ggplot() +
+  tidyterra::geom_spatraster(data = lc_2010_proj) +
+  geom_sf(aes(colour = Id_Number), shape = 21, stroke = 1,
+          fill = "white", alpha = 0.5) +  
+  geom_sf(data = nwt_names, size = 4, 
+          fill = "white", shape = 21,
+          stroke = 2) +
+  geom_sf_label(data = nwt_names, aes(label = GEONAME),
+                nudge_y = -0.08) +
+  labs(fill = "Landcover", colour = "Muskox collar") +
+    scale_fill_manual(values = cols) +
+  theme_bw(10) +
+  theme(legend.box = "horizontal")
+
+
+```
+
+```{r}
+musk_lc <- musk_collar_filt %>%
+  mutate(lc = extract(lc_2010_proj, musk_collar_filt, ID = FALSE)$value,
+         Group = ifelse(month<5|month>10,"Occurrence\nWinter (Nov - Apr)","Occurrence\nSummer (May - Sep)")) %>%
+  st_drop_geometry() %>%
+  group_by(Group, lc) %>%
+  summarise(n = n()) %>%
+  group_by(Group) %>%
+  mutate(freq = n/sum(n)) 
+
+lc_props <- freq(lc_2010_proj) %>%
+  mutate(freq = count/sum(count),
+         lc = factor(value, levels = levels(lc_atts$Classification)),
+         Group = "Availability") %>%
+  select(Group, lc, freq)
+
+
+musk_lc %>%
+  select(-n) %>%
+  bind_rows(lc_props) %>%
+  filter(lc != "Snow and Ice") %>%
+  ggplot(aes(x = lc, y = freq, fill = lc)) +
+  geom_col() +
+  facet_wrap(~Group) +
+  ylab("Proportion of GPS fixes") +
+  labs(fill = "Landcover") +
+  xlab("Landcover") +
+  scale_fill_manual(values = cols) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+```{r fig.height=6, fig.width=10}
+#| label: ind_maps
+#| dependson: spat-plot
+#| echo: FALSE
+#| warning: FALSE
+
+
+musk_collar_filt %>%
+  st_drop_geometry() %>%
+  group_by(month) %>%
+  summarise(avg_sl = mean(pDist, na.rm = TRUE))
+
+bbox <- musk_collar_filt %>%
+  filter(Id_Number == 7012) %>%
+  st_bbox()
+
+empty <- st_as_sfc("POINT(EMPTY)", crs = 4326)
+
+musk_collar_filt %>%
+  filter(Id_Number == 7012) %>%
+  select(geometry) %>%
+  summarise() %>%
+  st_cast("LINESTRING") %>%
+  ggplot() +
+  tidyterra::geom_spatraster(data = lc_2010_proj) +
+  geom_sf(linewidth = 2, colour = "magenta") + 
+  coord_sf(xlim = c(bbox[1],bbox[3]),
+           ylim = c(bbox[2],bbox[4])) + 
+  labs(fill = "") +
+  scale_fill_manual(values = cols) +
+  theme_bw(10) +
+  theme(legend.box = "horizontal")
+
+
+```

@@ -13,7 +13,7 @@ musk_collar <- readRDS("data/processed/musk_collar.rds")
 
 source("scripts/functions/anim_function.R")
 
-anim_function(c(7012,7013))
+anim_function(7011)
 
 for (collar in unique(musk_collar$Id_Number)) {
   anim_function(collar)

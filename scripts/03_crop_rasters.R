@@ -17,8 +17,11 @@ lc_atts <- read_csv("data/raw/landcover/ClassIndex_IndiceDeClasse.csv",
                     skip = 1) %>%
   separate(RGB,c("R","G","B"),"; ", convert = TRUE) %>%
   ### remove french classification and convert rgb to hex
-  mutate(Classification = str_remove(Classification, "/.*"),
+  mutate(Classification = str_replace_all(Classification, "[^[:alnum:]^/^-]", " "),
+    Classification = str_remove_all(Classification, "/.*"),
+    Classification = fct_reorder(Classification, Value),
          hex = rgb(R,G,B,maxColorValue = 255))
+saveRDS(lc_atts, "data/processed/lc_atts.rds")
 
 ### Load muskox collar data in Sahtu
 musk_collar <- readRDS("data/processed/musk_collar.rds")
@@ -39,10 +42,10 @@ lc_2010_crop <- terra::crop(lc_2010, buffer) %>%
 ## now project land cover to same crs as location data for plotting
 lc_2010_proj <- lc_2010_crop %>%
   terra::project(y = "epsg:4326") %>%
-  terra::crop(musk_season %>% sf::st_buffer(dist = 10000))
+  terra::crop(musk_collar %>% sf::st_buffer(dist = 10000))
 
-writeRaster(lc_2010_crop, "data/processed/lc_2010_crop.tif")
-writeRaster(lc_2010_proj, "data/processed/lc_2010_proj.tif")
+writeRaster(lc_2010_crop, "data/processed/lc_2010_crop.tif", overwrite = TRUE)
+writeRaster(lc_2010_proj, "data/processed/lc_2010_proj.tif", overwrite = TRUE)
 
 
   

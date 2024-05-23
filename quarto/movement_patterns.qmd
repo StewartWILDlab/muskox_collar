@@ -11,7 +11,6 @@ editor_options:
 
 library(tidyverse)
 library(sf)
-library(terra)
 library(here)
 ```
 
@@ -20,7 +19,6 @@ library(here)
 #| include: false
 
 musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
-lc_2010_proj <- rast(here("data/processed/lc_2010_proj.tif"))
 ```
 
 In this document, we will examine patterns in the movement behaviours of collared muskoxen. We will use muskox speed and turning angles to explore behaviour.
@@ -35,21 +33,23 @@ In this document, we will examine patterns in the movement behaviours of collare
 
 musk_collar_filt %>%
   mutate(Season = case_when(
-           between(month, 3, 5) ~ "Spring",
-           between(month, 6, 8) ~ "Summer",
-           between(month, 9, 11) ~ "Autumn",
-           TRUE ~ "Winter"),
+           between(month, 3, 5) ~ "Spring (Mar - May)",
+           between(month, 6, 8) ~ "Summer (Jun - Aug)",
+           between(month, 9, 11) ~ "Autumn (Sep - Nov)",
+           TRUE ~ "Winter (Dec - Feb)"),
          Season = factor(Season,
-                         levels = c("Winter", "Spring",
-                                    "Summer", "Autumn"))
+                         levels = c("Winter (Dec - Feb)", "Spring (Mar - May)",
+                                    "Summer (Jun - Aug)", "Autumn (Sep - Nov)"))
     ) %>%
   filter(pTime == 8) %>%
   ggplot(aes(x = datetime, y = pDist + 0.01)) +
   geom_point(aes(colour = Season), size = 0.5) +
   geom_smooth(method = "loess", span = 0.25, alpha = 0.5) +
-  scale_y_log10() +
+  scale_y_log10(labels = scales::comma) +
+  guides(colour = guide_legend(override.aes = list(size=3))) +
   ylab("Step length (km)") +
-  facet_wrap(~Id_Number, scales = "free_x") +
+  xlab("Date") +
+  facet_wrap(~Id_Number) +
   scale_colour_manual(values = c("lightblue3","springgreen","yellow2","orange")) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
@@ -192,44 +192,16 @@ xy <- musk_collar_sub %>%
 ltraj <- adehabitatLT::as.ltraj(xy = xy, date = musk_collar_sub$datetime, id = musk_collar_sub$Id_Number)
 
 adehabitatLT::ld(ltraj) %>%
+  filter(!(id %in% c(707,709,710))) %>%
   ggplot(aes(x = date, y = R2n)) +
   geom_point(size = 0.5) +
   geom_line() +
   ylab("Net squared displacement (km^2)") +
-  facet_wrap(~id, scales = "free") +
+  xlab("Date") +
+  facet_wrap(~id) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
 The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area.
 
-## Spatial Patterns
-
-```{r fig.height=6, fig.width=10}
-#| label: spat-plot
-#| dependson: dist_seas
-#| echo: FALSE
-#| warning: FALSE
-
-lc_2010_proj <- rast(here("data/processed/lc_2010_proj.tif"))
-nwt_names <-sf::st_read(here("data/raw/nwt_names/cgn_nt_shp_eng.shp"),
-                         quiet = TRUE) %>%
-  sf::st_transform(4326) %>%
-  sf::st_crop(lc_2010_proj) %>%
-  filter(GENERIC == "Town")
-
-musk_season %>%
-  ggplot() +
-  tidyterra::geom_spatraster(data = lc_2010_proj) +
-  geom_sf(aes(colour = Id_Number), shape = 21, stroke = 1,
-          fill = "white", alpha = 0.5) +  
-  geom_sf(data = nwt_names, size = 4, 
-          fill = "white", shape = 21,
-          stroke = 2) +
-  geom_sf_label(data = nwt_names, aes(label = GEONAME),
-                nudge_y = -0.08) +
-  theme_bw(10) +
-  theme(legend.box = "horizontal")
-
-
-```
