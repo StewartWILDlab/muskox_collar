@@ -112,6 +112,7 @@ These look okay, but they aren't capturing the short timescales well in all inst
 ```{r}
 #| label: musk_mod_err
 #| dependson: "musk_var2"
+#| echo: FALSE
 
 # Had to save the parameters for variogram error here as I couldn't find
 # another way to save them without using the interactive variogram fit function
@@ -124,75 +125,139 @@ for (i in 1:length(musk_var_mod_err)){musk_var_mod_err[[i]]$error=var_error$erro
 
 #fit2 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},musk_tel,musk_var_mod_err)
 #saveRDS(fit2, here("output/musk_var_fit2.rds"))
-fit2 <- readRDS(here("output/musk_var_fit2.rds"))
-
-for (i in 1:length(musk_var)){print(musk_var[[i]]@info$identity);print(summary(fit2[,i])); plot(musk_var[[i]], CTMM = fit2[,i], col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[i]], CTMM = fit2[,i], col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)}
+# fit2 <- readRDS(here("output/musk_var_fit2.rds"))
+# 
+# for (i in 1:length(musk_var)){print(musk_var[[i]]@info$identity);print(summary(fit2[,i])); plot(musk_var[[i]], CTMM = fit2[,i], col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[i]], CTMM = fit2[,i], col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)}
 
 ```
 
 
-These look okay, but they aren't capturing the short timescales well in all instances. To illustrate this point, let's simulate new data based on the best fitted model for collar 706. 
+Let's simulate new data based on the best fitted model for collar 706. 
 
 ```{r}
 #| label: musk_sim
 #| dependson: "musk_var_mod"
+#| echo: FALSE
 
-# set.seed(1)
-# musk_sim <- simulate(fit[,1][[1]], t=musk_tel[[1]]$t)
-# var_sim <- variogram(musk_sim)
-# plot(var_sim, CTMM = fit[,1][[1]],fraction = 0.65, level = 0.5, col = "blue");title("Simulated 1")
-# plot(musk_var[[1]], CTMM = fit[,1][[1]],fraction = 0.65, level = 0.5);title("Real")
-# plot(var_sim, CTMM = fit[,1][[1]],xlim = xlim, level = 0.5, col = "blue");title("Simulated")
-# plot(musk_var[[1]], CTMM = fit[,1][[1]],xlim = xlim, level = 0.5);title("Real")
-# plot(musk_var[[1]],musk_var_mod[[1]],xlim = xlim, level = 0.5)
+set.seed(1)
+musk_sim <- simulate(fit[,1][[1]], t=musk_tel[[1]]$t)
+var_sim <- variogram(musk_sim)
+plot(var_sim, CTMM = fit[,1][[1]],fraction = 0.65, level = 0.5, col = "blue");title("Simulated 1")
+plot(musk_var[[1]], CTMM = fit[,1][[1]],fraction = 0.65, level = 0.5);title("Real")
+plot(var_sim, CTMM = fit[,1][[1]],xlim = xlim, level = 0.5, col = "blue");title("Simulated")
+plot(musk_var[[1]], CTMM = fit[,1][[1]],xlim = xlim, level = 0.5);title("Real")
 ```
 
 At large time scales, the modelled variogram does not appear to match up very well against the empirical variograms of the simulated and observed data. This is because the errors in the variograms (difference between modelled and empirical) are autocorrelated. Small perturbations are carried forward and can add up over time, but these are not necessarily a bad thing for fitting our model. 
 
 In addition, as the time lag increase, so to does our uncertainty about the estimated semi-variance because larger time lags have fewer pairs of data points to estimate the semi-variance. We have the most certainty at short time lags because we have many pairs of data to estimate uncertainty. It appears as though the simulated variogram is better represented by our current model 
 
-We can use kernel density estimates that account for these underlying movement models using the **akde** function. 
+## Creating Auto Correlated Kernel Density Estimates
+
+We can use kernel density estimates that account for these underlying movement models using the **akde** function. We will also plot the telemetry points and colour them by day in order to understand when nomadic/dispersal events occur.
 
 ```{r, fig.height=4}
 #| label: akde
 #| dependson: "musk_var_mod"
 
-akde <- akde(musk_tel[[5]],fit[,5][[1]])
-EXT <- extent(akde,level=0.95)
-plot(musk_tel[[5]],UD=akde,xlim=EXT$x,ylim=EXT$y)
+best_fit <- fit[1,]
+akde <- mapply(function(x,y){akde(x,y)},musk_tel,best_fit)
+EXT <- lapply(akde, extent, level=0.95)
+for(i in 1:length(akde)){plot(musk_var[[i]], fraction = 1);
+  title(names(musk_tel)[[i]]);
+  COL <- color(musk_tel[[i]],by='time')
+  plot(musk_tel[[i]],UD=akde[[i]],
+       xlim=EXT[[i]]$x,ylim=EXT[[i]]$y,
+       col = COL, lwd=4)
+  }
+
+  
 ```
+
+For the most part, the home range estimates look pretty good, but there are some concerning aspects with clusters of points that look like they represent dispersal events. 706, 7011, 7012, and 7013 all have periods of time (usually at the start or end of the time series) where they moved away from the core home range area. I'm not sure if these are concerning, but some of the odd variograms would suggest they are. 
+
+Another thing to consider is that for some muskoxen, there appears to be some periodicity in their movement, which affects the home rnage estimates. 708 is a good example where the semi-variance decreases at certain times leading to an underestimated variogram model. This causes the fairly conservative home range estimate. 
+
+Lastly, these models don't account for barrier to muskox movement. 7080 in particular has a lake in its home range that it travles around. This is probably why the home range estimate is split into different sections despite the variogram suggesting a range resident individual. 
+
+```{r, fig.height=4}
+#| dependson: "akde"
+#| echo: FALSE
+
+
+map(akde, function(x){as_tibble(summary(x)$CI)}) %>%
+  list_rbind() %>%
+  set_names(c("lower","mean","upper")) %>%
+  mutate(id = factor(names(musk_tel), levels = names(musk_tel)),
+         mean = round(mean),
+         lower = round(lower),
+         upper = round(upper)) %>%
+  select(id,lower,mean,upper) %>%
+  ggplot(aes(x = id, y = mean)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper)) +
+  ylab("Home range size (km2)") +
+  xlab("Muskox ID") +
+  theme_bw()
+
+musk_move %>%
+  filter(individual.local.identifier %in% names(musk_tel)) %>%
+  mutate(date = as.Date(timestamp),
+         id = factor(individual.local.identifier, levels = names(musk_tel))) %>%
+  group_by(id) %>%
+  summarise(days = max(date) - min(date)) %>%
+  ggplot(aes(x = id, y = days)) +
+  geom_point(size = 2) +
+  ylab("Number of days") +
+  xlab("Muskox ID") +
+  theme_bw()
+```
+
+There does not appear to be a strong relationship between the days that a collar was active and the size of the home range. The muskox with the second most number of days has the highest home range estimate, but the muskox with the least amount of days has the second highest estimate. 
+
 
 ```{r, fig.height=4}
 #| label: musk_var_cv
 #| dependson: "load-data"
+#| echo: FALSE
 
-musk_7011 <- musk_move %>%
-  filter(individual.local.identifier == 7011) %>%
-  mutate(datetime = as.POSIXct(timestamp))
-musk_move_cv <- musk_7011 %>%
-  bind_rows(musk_7011 %>% 
-              filter(datetime < min(datetime)+(365/2)*24*60*60) %>%
-              mutate(individual.local.identifier = 7011.1)) %>%
-  bind_rows(musk_7011 %>% 
-              filter(datetime < min(datetime)+(365)*24*60*60) %>%
-              mutate(individual.local.identifier = 7011.2)) %>%
-  bind_rows(musk_7011 %>% 
-              filter(datetime < min(datetime)+(365*1.5)*24*60*60) %>%
-              mutate(individual.local.identifier = 7011.3))
-musk_tel_cv <- as.telemetry(musk_move_cv)
-musk_var_cv <- lapply(musk_tel_cv, variogram, fast = FALSE)
-for (i in 1:length(musk_var_cv)){plot(musk_var_cv[i], fraction = 0.65);title(musk_var_cv[[i]]@info$identity)}
-
-musk_var_cv_mod <- lapply(musk_var_cv, variogram.fit, interactive = FALSE)
-fit_cv <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},musk_tel_cv,musk_var_cv_mod)
-
-akde <- list(akde(musk_tel_cv[[1]],fit_cv[,1][[1]]),
-             akde(musk_tel_cv[[2]],fit_cv[,2][[1]]),
-             akde(musk_tel_cv[[3]],fit_cv[,3][[1]]),
-             akde(musk_tel_cv[[4]],fit_cv[,4][[1]]))
-plot(musk_tel_cv[[1]],UD=akde[[2]])
-plot(musk_tel_cv[[1]],UD=akde[[3]])
-plot(musk_tel_cv[[1]],UD=akde[[4]])
-plot(musk_tel_cv[[1]],UD=akde[[1]])
+# musk_7011 <- musk_move %>%
+#   filter(individual.local.identifier == 7011) %>%
+#   mutate(datetime = as.POSIXct(timestamp))
+# musk_move_cv <- musk_7011 %>%
+#   bind_rows(musk_7011 %>% 
+#               filter(datetime < min(datetime)+(365/2)*24*60*60) %>%
+#               mutate(individual.local.identifier = 7011.1)) %>%
+#   bind_rows(musk_7011 %>% 
+#               filter(datetime < min(datetime)+(365)*24*60*60) %>%
+#               mutate(individual.local.identifier = 7011.2)) %>%
+#   bind_rows(musk_7011 %>% 
+#               filter(datetime < min(datetime)+(365*1.5)*24*60*60) %>%
+#               mutate(individual.local.identifier = 7011.3))
+# musk_tel_cv <- as.telemetry(musk_move_cv)
+# musk_var_cv <- lapply(musk_tel_cv, variogram, fast = FALSE)
+# for (i in 1:length(musk_var_cv)){plot(musk_var_cv[i], fraction = 0.65);title(musk_var_cv[[i]]@info$identity)}
+# 
+# musk_var_cv_mod <- lapply(musk_var_cv, variogram.fit, interactive = FALSE)
+# fit_cv <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},musk_tel_cv,musk_var_cv_mod)
+# 
+# akde <- list(akde(musk_tel_cv[[1]],fit_cv[,1][[1]]),
+#              akde(musk_tel_cv[[2]],fit_cv[,2][[1]]),
+#              akde(musk_tel_cv[[3]],fit_cv[,3][[1]]),
+#              akde(musk_tel_cv[[4]],fit_cv[,4][[1]]))
+# plot(musk_tel_cv[[1]],UD=akde[[2]])
+# plot(musk_tel_cv[[1]],UD=akde[[3]])
+# plot(musk_tel_cv[[1]],UD=akde[[4]])
+# plot(musk_tel_cv[[1]],UD=akde[[1]])
 
 ```
+
+## Seasonal Ranges
+
+```{r}
+
+musk_season <- readRDS(here("data/processed/musk_season.rds"))
+
+
+
+```
+

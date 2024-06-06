@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.3.450">
+<meta name="generator" content="quarto-1.4.553">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -22,7 +22,7 @@ ul.task-list li input[type="checkbox"] {
 }
 /* CSS for syntax highlighting */
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -79,7 +79,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   "collapse-after": 3,
   "panel-placement": "start",
   "type": "textbox",
-  "limit": 20,
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
   "language": {
     "search-no-results-text": "No results",
     "search-matching-documents-text": "matching documents",
@@ -88,14 +94,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-more-match-text": "more match in this document",
     "search-more-matches-text": "more matches in this document",
     "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
     "search-detached-cancel-button-title": "Cancel",
     "search-submit-button-title": "Submit",
     "search-label": "Search"
   }
 }</script>
-
 <script src="../site_libs/kePrint-0.0.1/kePrint.js"></script>
+
 <link href="../site_libs/lightable-0.0.1/lightable.css" rel="stylesheet">
+
 
 
 </head>
@@ -106,19 +114,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <header id="quarto-header" class="headroom fixed-top">
   <nav class="quarto-secondary-nav">
     <div class="container-fluid d-flex">
-      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/data_exploration.html">Data Cleaning</a></li></ol></nav>
-      <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
-      </a>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/data_exploration.html">Data Cleaning</a></li></ol></nav>
+        <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
     </div>
   </nav>
 </header>
 <!-- content -->
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
 <!-- sidebar -->
-  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation docked overflow-auto">
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
     <div class="pt-lg-2 mt-2 text-left sidebar-header">
     <div class="sidebar-title mb-0 py-0">
       <a href="../">NWT Muskox Collar Project</a> 
@@ -147,7 +155,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </ul>
     </div>
 </nav>
-<div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
     
 <!-- main -->
@@ -168,14 +176,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </div>
   
 
+
 </header>
+
 
 <section id="sample-size" class="level2">
 <h2 class="anchored" data-anchor-id="sample-size">Sample Size</h2>
 <p>Movement data for this project come from 10 female muskoxen in the Sahtu region of the Northwest Territories (NWT) that were collared between December 2007 and February 2012.</p>
 <p>We can plot the date ranges of individual collared muskoxen below:</p>
-<div class="cell" data-hash="data_exploration_cache/html/daterange_c1deb93fb2fa4920de9a459f8d33d25c">
+<div class="cell">
 <div class="cell-output-display">
+<div>
 <table class="table table-sm table-striped small" data-quarto-postprocess="true">
 <thead>
 <tr class="header">
@@ -241,24 +252,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 </div>
 </div>
+</div>
 <p>Muskoxen 707, 709, 710, and 7010 have less than a year of movement data and only 7011, 7012, and 7013 have more than 2 years of data.</p>
 </section>
 <section id="collar-failure" class="level2">
 <h2 class="anchored" data-anchor-id="collar-failure">Collar Failure</h2>
 <p>Before we look into the data, there are some data cleaning steps we can use to remove errors from that dataset. First, we know that collars 707, 709, and 710 had their release mechanisms triggered early, so we need to look at the data to figure out when this happened. Let’s start by looking at histograms of step lengths:</p>
-<div class="cell" data-hash="data_exploration_cache/html/dist_hist_e92ec7bf8d1c79ba48424d4dbb9c8066">
+<div class="cell">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/dist_hist-1.png" class="img-fluid" width="672"></p>
+<div>
+<figure class="figure">
+<p><img src="data_exploration_files/figure-html/dist_hist-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>The stepped nature of the distances traveled on the left side of the graph are a result of the resolution of the GPS device. For collars 707, 709, and 710, there appear to be a greater-than-expected number of instances where the muskoxen move negligible distances. By plotting time series of step lengths, we can can see that these negligible distances occur at the end of the recording periods:</p>
-<div class="cell" data-hash="data_exploration_cache/html/dist_time_0e6773a15e52c2d6ee9029f939736bee">
+<div class="cell">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/dist_time-1.png" class="img-fluid" width="768"></p>
+<div>
+<figure class="figure">
+<p><img src="data_exploration_files/figure-html/dist_time-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>For simplicity, let’s remove all points following the first two consecutive short step lengths (i.e.&nbsp;0 or 4.4747041) at the end of the time series.</p>
-<div class="cell" data-hash="data_exploration_cache/html/fix_data_1e5e93c5f68bf05f39a5d7a856e7f452">
+<div class="cell">
 <div class="cell-output-display">
 <table class="table table-sm table-striped small">
 <thead>
@@ -289,7 +309,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="data-filtering">Data Filtering</h2>
 <p>Now that we have removed data that we know contain errors, we can start to look for less obvious sources of errors. The SDLfilter package has two functions, <em>dupfilter</em> and <em>ddfilter,</em> that remove data duplicates and unlikely points, respectively.</p>
 <p>First let’s use <em>dupfilter</em> to remove duplicate data points with the same date and time.</p>
-<div class="cell" data-hash="data_exploration_cache/html/sdl_dup_978bba56ad922400f5c9447a612852fc">
+<div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>sdl_dup <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">dupfilter</span>(sdl_musk, </span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>                                <span class="at">step.time =</span> <span class="dv">7</span>,</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>                                <span class="at">conditional =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -306,7 +326,7 @@ dupfilter removed 34 locations (0.24% of original data)</code></pre>
 </div>
 </div>
 <p>Next we’ll use <em>ddfilter</em> to filter points based on speed and turning angles between consecutive points. To use this function, we need to estimate the maximum reasonable speed between two consecutive locations. The <em>vmax</em> function maps a gamma distribution to the observed speeds and estimates the maximum speed as the value with a cumulative probability of 0.999.</p>
-<div class="cell" data-hash="data_exploration_cache/html/vmax_cf53ac550fa3671ecdd78ee91a805f71">
+<div class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>vmax <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">vmax</span>(sdl_dup, <span class="at">prob =</span> <span class="fl">0.999</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
@@ -325,7 +345,7 @@ Vmax: 0.4891431 km/h</code></pre>
 </div>
 </div>
 <p>We will also estimate the maximum one-way linear speed of a loop trip. A loop trip is defined as a spatial departure and return involving a series of three or more consecutive points. The <em>vmaxlp</em> function also uses a gamma distribution to estimate this speed:</p>
-<div class="cell" data-hash="data_exploration_cache/html/vmaxlp_65c392b16c9ef64787e6605ca7e067e7">
+<div class="cell">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>vmaxlp <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">vmaxlp</span>(sdl_dup, <span class="at">prob =</span> <span class="fl">0.999</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
@@ -345,7 +365,7 @@ vmaxlp: 0.269 km/h</code></pre>
 </div>
 </div>
 <p>Now we can filter our data using <em>ddfilter</em>. Locations are removed if one of following criteria are met: 1) speed from previous and to subsequent location both exceed <strong>vmax</strong>; 2) inner angle is less than a given threshold and speed from a previous or to a subsequent location exceeds <strong>vmaxlp</strong>. We will specify a turning angle of 14 degrees, as outlined in Bjørneraas et al.&nbsp;2010.</p>
-<div class="cell" data-hash="data_exploration_cache/html/sdl_dd1_fde69cec09cecffe82e2d0dfcd4cc85f">
+<div class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>sdl_dd1 <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">ddfilter</span>(sdl_dup, <span class="at">qi =</span> <span class="dv">5</span>, </span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">vmax =</span> vmax, <span class="at">vmaxlp =</span> vmaxlp,</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                              <span class="at">ia =</span> <span class="dv">14</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -359,13 +379,17 @@ Filtered data: 13954 locations
 ddfilter removed 77 locations (0.55% of original data)</code></pre>
 </div>
 </div>
-<div class="cell" data-hash="data_exploration_cache/html/unnamed-chunk-12_2077558a605adf5e7a71a69fdced7f73">
+<div class="cell">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid" width="768"></p>
+<div>
+<figure class="figure">
+<p><img src="data_exploration_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>The filtered points appear non-randomly across the time series, which suggests that our speed thresholds were too small. Let’s increase <strong>vmax</strong> and <strong>vmaxlp</strong> to more conservative values of 2 km/h and 1 km/h, respectively.</p>
-<div class="cell" data-hash="data_exploration_cache/html/sdl_dd2_9d25b25db3f7c0209515bb9a20864605">
+<div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sdl_dd2 <span class="ot">&lt;-</span> SDLfilter<span class="sc">::</span><span class="fu">ddfilter</span>(sdl_dup, <span class="at">qi =</span> <span class="dv">5</span>, </span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">vmax =</span> <span class="dv">2</span>, <span class="at">vmaxlp =</span> <span class="dv">1</span>,</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>                              <span class="at">ia =</span> <span class="dv">14</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -379,9 +403,13 @@ Filtered data: 14029 locations
 ddfilter removed 2 locations (0.01% of original data)</code></pre>
 </div>
 </div>
-<div class="cell" data-hash="data_exploration_cache/html/unnamed-chunk-14_0b4b344078cca9f05e59d39545ebf6ac">
+<div class="cell">
 <div class="cell-output-display">
-<p><img src="data_exploration_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="768"></p>
+<div>
+<figure class="figure">
+<p><img src="data_exploration_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
 </div>
 </div>
 <p>That seems to do a better job of only removing the most extreme points.</p>
@@ -389,7 +417,7 @@ ddfilter removed 2 locations (0.01% of original data)</code></pre>
 <section id="post-deployment-bias" class="level2">
 <h2 class="anchored" data-anchor-id="post-deployment-bias">Post-deployment Bias</h2>
 <p>Lastly, we will remove any points collected within 24 hours of collar deployments to remove the immediate effects of capture and handling.</p>
-<div class="cell" data-hash="data_exploration_cache/html/musk_collar_filt_26737d3d4a7b3d2e55f8322d72f2b201">
+<div class="cell">
 <div class="cell-output-display">
 <table class="table table-sm table-striped small">
 <thead>
@@ -527,10 +555,27 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     // clear code selection
     e.clearSelection();
   });
-  function tippyHover(el, contentFn) {
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
     const config = {
       allowHTML: true,
-      content: contentFn,
       maxWidth: 500,
       delay: 100,
       arrow: false,
@@ -540,8 +585,17 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       interactive: true,
       interactiveBorder: 10,
       theme: 'quarto',
-      placement: 'bottom-start'
+      placement: 'bottom-start',
     };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
     window.tippy(el, config); 
   }
   const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
@@ -553,7 +607,130 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       try { href = new URL(href).hash; } catch {}
       const id = href.replace(/^#\/?/, "");
       const note = window.document.getElementById(id);
-      return note.innerHTML;
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
     });
   }
       let selectedAnnoteEl;
@@ -597,6 +774,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             }
             div.style.top = top - 2 + "px";
             div.style.height = height + 4 + "px";
+            div.style.left = 0;
             let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
             if (gutterDiv === null) {
               gutterDiv = window.document.createElement("div");
@@ -622,6 +800,32 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
         });
         selectedAnnoteEl = undefined;
       };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
       // Attach click handler to the DT
       const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
       for (const annoteDlNode of annoteDls) {
@@ -682,6 +886,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
+
 
 
 
