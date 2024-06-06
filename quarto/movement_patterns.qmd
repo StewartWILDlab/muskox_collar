@@ -12,6 +12,7 @@ editor_options:
 library(tidyverse)
 library(sf)
 library(here)
+library(terra)
 ```
 
 ```{r}
@@ -19,6 +20,7 @@ library(here)
 #| include: false
 
 musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
+snowdepth_mean <- readRDS(here("data/processed/snowdepth_mean.rds")) 
 ```
 
 In this document, we will examine patterns in the movement behaviours of collared muskoxen. We will use muskox speed and turning angles to explore behaviour.
@@ -112,11 +114,143 @@ musk_season %>%
 
 The curves of step lengths follow similar trajectories but there is still considerable variation across years and among muskoxen. This suggests weather, landscape, and muskox characteristics may play a part in influencing movement behaviour.
 
-Movement behaviour in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the spring to investigate how approximate calving dates impact movement.
+## Defining Seasons
+
+We can use snow depth data from the SnowModel project to look at how snow depth impacts step lengths
 
 ```{r, fig.height=6, fig.width=8}
+#| label: snowdepth 
+#| dependson: "load-data"  
+
+snowdepth_mean %>%  
+  mutate(month = month(date)) %>%
+  ggplot(aes(x=date, y=snow_depth, colour = factor(month), group = 1)) + 
+  geom_line(linewidth = 2) +  
+  ylab("Average snow depth (m)") +  
+  xlab("Date") +   
+  theme_bw() 
+```
+
+Clearly there are large changes in snow depth across seasons. Let's plot snow depth against step lengths to see how they match up.
+
+```{r, fig.height=6, fig.width=8}
+#| label: musk_snow 
+#| dependson: "load-data" 
+
+musk_snow <- musk_collar_filt %>%
+  mutate(date = as.Date(datetime)) %>%
+  left_join(snowdepth_mean)
+
+musk_snow %>%
+  filter(pTime == 8, !is.na(snow_depth)) %>%
+  group_by(snow_depth) %>%
+  summarise(mean = mean(pDist),
+            lower = quantile(pDist,0.05),
+            upper = quantile(pDist,0.95)) %>%
+  ggplot(aes(x=snow_depth, y = mean)) +
+  geom_pointrange(aes(ymin=lower, ymax=upper)) +
+  ylab("Step length (km)") +
+  xlab("Snow depth (m)") +
+  theme_bw()
+  
+```
+
+Based on this graph, step lengths decrease with increasing snow depth, as expected. The relationship appears to be exponential as well, with changes in step length becoming smaller as step length becomes smaller. Let's plot our step length time series again but with colours representing 0.05 m bins of snow depth.
+
+```{r, fig.height=6, fig.width=8}
+#| label: snow_step 
+#| dependson: "musk_snow" 
+#| echo: FALSE
+
+musk_snow %>%
+  filter(pTime==8) %>%
+  mutate(week = week(datetime)) %>%
+  group_by(week, year) %>%
+  summarise(step_week = mean(pDist),
+            step_snow = mean(snow_depth),
+            date = min(date)) %>%
+  mutate(snow_bin = case_when(
+           between(step_snow, 0, 0.05) ~ "0 - 0.05",
+           between(step_snow, 0.05, 0.1) ~ "0.05 - 0.1",
+           between(step_snow, 0.1, 0.15) ~ "0.1 - 0.15",
+           between(step_snow, 0.15, 0.2) ~ "0.15 - 0.2",
+           between(step_snow, 0.2, 0.25) ~ "0.2 - 0.25",
+           TRUE ~ ">0.25"),
+         snow_bin = factor(snow_bin, 
+                          levels = c("0 - 0.05","0.05 - 0.1",
+                                     "0.1 - 0.15","0.15 - 0.2",
+                                     "0.2 - 0.25",">0.25"))) %>%
+  ggplot(aes(x = date, y = step_week)) +
+  geom_point(aes(colour = snow_bin), size = 2) +
+  geom_line(aes(colour = snow_bin, group = 1)) +
+  guides(colour = guide_legend(override.aes = list(size=3))) +
+  ylab("Average Step length (km)") +
+  xlab("Date") +
+  labs(colour = "Snow depth (m)") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+```
+
+It looks like once snow is deeper than \~0.1 m on average, muskox movement decreases well beyond the typical summer step lengths. Of note in the winter of 2010-2011, the snow is especially deep for an extended period of time and step lengths are at their lowest.
+
+To define seasons, let's use a cut-off of 0.1 m snow depth. We'll define the start of winter as the first three successive days with snow depth \>=0.1 m and the end of winter as the first three successive days with snow depth \<=0.1 m.
+
+```{r}
+#| label: musk_season 
+#| dependson: "load-data"
+#| echo: FALSE
+ 
+
+musk_season <- snowdepth_mean %>%
+  mutate(year = year(date),
+         ### subset entries that match the critera for the start of winter and summer
+         date_winter = ifelse(snow_depth>=0.1&
+                                lead(snow_depth,1)>=0.1&
+                                lead(snow_depth,2)>=0.1&
+                                month(date)>=7,
+                              date,NA),
+         date_summer = ifelse(snow_depth<=0.1&
+                                lead(snow_depth,1)<=0.1&
+                                lead(snow_depth,2)<=0.1,
+                              date,NA)) %>%
+  ### identify the first day of winter and summer each year
+  group_by(year) %>%
+  mutate(min_winter = min(date_winter, na.rm = TRUE),
+         min_summer = min(date_summer, na.rm = TRUE),
+         season = ifelse(date<min_summer|date>=min_winter,
+                         "winter",
+                         "summer")) %>%
+  ungroup() %>%
+  select(date, year, season)
+
+saveRDS(musk_season, here("data/processed/musk_season.rds"))
+
+musk_season %>%
+  group_by(year) %>%
+  mutate(n = n()) %>%
+  filter(month(date)>=7|season=="summer") %>%
+  group_by(year) %>%
+  mutate(n_diff = n - n()) %>%
+  group_by(year,season) %>%
+  summarise(start = min(date),
+            length = n(),
+            n_diff = max(n_diff)) %>%
+  pivot_wider(names_from = "season", values_from = c("start","length")) %>%
+  ungroup() %>%
+  mutate(length_winter = length_winter + lead(n_diff,1)) %>%
+  select(-n_diff) %>%
+  knitr::kable()
+
+```
+
+## Muskox Calving
+
+Movement behaviour in spring may be related to calving. Previous studies in Greenland have shown that muskoxen benefit from earlier spring green-up (Eikelenboom et al., 2021), so muskoxen may be able to alter their movement behaviour depending on green-up timing. In 2008 and 2009, surveys were flown to relocate collared muskoxen to see if they were accompanied by calves. We can plot these data on graphs of step lengths in the spring to investigate how approximate calving dates impact movement.
+
+```{r, fig.height=8, fig.width=10}
 #| label: dist_calf
-#| dependson: "dist_seas"
+#| dependson: "musk_snow"
 #| echo: FALSE
 #| warning: FALSE
 
@@ -148,7 +282,7 @@ musk_calf_exp <- musk_calf %>%
   filter(lubridate::year(Date)==year) %>%
   fill(with_calf, .direction = "downup")
 
-musk_season %>%
+musk_snow %>%
   mutate(yday = yday(datetime)) %>%
   group_by(Id_Number, year) %>%
   filter(month %in% 3:6, pTime == 8, year %in% 2008:2009,
@@ -157,13 +291,16 @@ musk_season %>%
   left_join(musk_calf_exp, by = c("Id_Number", "year", "Date")) %>%
   ggplot(aes(x = datetime, y = pDist, colour = with_calf, group = Id_Number)) +
   geom_line() +
+  geom_line(aes(y = snow_depth*5-1.5), colour = "black") +
   geom_point(data = musk_calf %>% filter(lubridate::month(Date) %in% 3:6,
                                          !(Id_Number %in% c(709,710))),
              aes(x = as.POSIXct(Date), y = 0), colour = "black") +
-  coord_cartesian(ylim=c(0,1.5)) +
+  coord_cartesian(ylim=c(-1.5,1.5)) +
   facet_wrap(~year+Id_Number, scales = "free_x") +
   scale_colour_manual(values = c("red", "grey", "blue")) +
-  ylab("Step length (km)") +
+  scale_y_continuous(name = "Step length (km)",
+                     sec.axis = sec_axis(~(.+1.5)/5, 
+                                         name = "Snow depth (m)")) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
         legend.key.width = unit(2,"cm"))
@@ -204,4 +341,3 @@ adehabitatLT::ld(ltraj) %>%
 ```
 
 The plot above shows the net squared displacement from the initial location for each collared muskoxen. There does not appear to be a clear movement behaviour shared between all muskoxen. Most appear to have short periods of time during the summer with large net squared displacement, but these are generally followed by longer periods where net squared displacement is much smaller. Muskoxen 7011 and 7012 show a general increasing trend in net squared displacement, but there are still extended periods of smaller displacement throughout the time series. Most of the periods of larger displacement do not appear to be long enough to represent a separate summer range. Examinations of animations of muskox movements generally show that they tend to move between patches of resources during the summer rather than sticking to one specific area.
-
