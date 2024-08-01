@@ -10,7 +10,6 @@ execute:
   error: false
 ---
 
-
 ```{r}
 #| label: load-packages
 #| include: false
@@ -19,7 +18,6 @@ library(tidyverse)
 library(sf)
 library(here)
 ```
-
 
 In this document, we will estimate home range size for collared muskoxen and look to compare range overlap and size across years and seasons.
 
@@ -43,7 +41,7 @@ First we will plot empirical variograms for each collared muskoxen. Variograms a
 #| dependson: "load-data"
 #| output: FALSE
 
-musk_var <- lapply(musk_tel, variogram, CI="Gauss", fast = FALSE)
+musk_var <- lapply(musk_tel, variogram, CI="Gauss", fast = TRUE)
 xlim <- c(0,5 %#% "day")
 ```
 
@@ -61,8 +59,7 @@ map(musk_var, function(x) x %>% as_tibble() %>% mutate(id = x@info$identity)) %>
   theme_bw()
 ```
 
-
-Most of these look fine, however for two of the longer time series (7011 and 7012) the semi-variance appears to reach an asymptote by the first year, but starts increasing again part way through the second year. If this behaviour is common, home range estimates may be biased even after a year's worth of data. If  muskoxen truly are nomadic and lack site fidelty, kernel density methods may not be appropriate (Silva et al., 2022).
+Most of these look fine, however for two of the longer time series (7011 and 7012) the semi-variance appears to reach an asymptote by the first year, but starts increasing again part way through the second year. If this behaviour is common, home range estimates may be biased even after a year's worth of data. If muskoxen truly are nomadic and lack site fidelty, kernel density methods may not be appropriate (Silva et al., 2022).
 
 It is also clear there are some issues with collars 708 and 7010. Closer inspection of the data reveals that, every 7 fixes, there is a longer 24 hour delay until the next fix. Currently, the model uses the median sampling interval (8 hours) to estimate the variogram. The **variogram** function allows is to specify more than one time interval (in our case, 8 and 24 hours) to progressively coarsen the variogram. We can also specify an interval-weighted algorithm to further improve the appearance of the variogram.
 
@@ -90,9 +87,9 @@ map(musk_var, function(x) x %>% as_tibble() %>% mutate(id = x@info$identity)) %>
   theme_bw()
 ```
 
-These look better. Collars 7011 and 7012 do not appear to reach an asymptote in semi-variance as lag increases, suggesting that these individuals are not range resident. 7010 has a somewhat bell-shaped curve. This can be indicative of distinct winter and summer grounds. However, given that muskoxen appear to have limited movement in the winter and the ~1-year time series for 7010 starts and ends in winter, it seems more likely that the wintering grounds from one year to the next happened to be close together.
+These look better. Collars 7011 and 7012 do not appear to reach an asymptote in semi-variance as lag increases, suggesting that these individuals are not range resident. 7010 has a somewhat bell-shaped curve. This can be indicative of distinct winter and summer grounds. However, given that muskoxen appear to have limited movement in the winter and the \~1-year time series for 7010 starts and ends in winter, it seems more likely that the wintering grounds from one year to the next happened to be close together.
 
-We can diagnose these issues further by fitting a variety of custom variogram functions to our data using the **ctmm.select** function. 
+We can diagnose these issues further by fitting a variety of custom variogram functions to our data using the **ctmm.select** function.
 
 ```{r, fig.height=4}
 #| label: musk_var_mod
@@ -114,25 +111,47 @@ These look okay, but they aren't capturing the short timescales well in all inst
 #| dependson: "musk_var2"
 #| echo: FALSE
 
-# Had to save the parameters for variogram error here as I couldn't find
-# another way to save them without using the interactive variogram fit function
-#variogram.fit(musk_var[[1]], name = "var_error")
-#saveRDS(var_error, here("data/processed/var_error.rds"))
-var_error <- readRDS(here("data/processed/var_error.rds"))
+musk_collar_cal <- read.csv(here("data/raw/muskox_data/musk_collar_cal_movebank.csv"))
+musk_cal <- as.telemetry(musk_collar_cal)
 
-musk_var_mod_err <- musk_var_mod
-for (i in 1:length(musk_var_mod_err)){musk_var_mod_err[[i]]$error=var_error$error; musk_var_mod_err[[i]]$errors=var_error$errors}
+UERE <- uere.fit(musk_cal)
+uere(musk_tel) <- UERE
+musk_var_mod_err <- lapply(musk_tel, ctmm.guess, interactive = FALSE, CTMM=ctmm(error=TRUE))
+musk_var_mod_err[[2]] <- ctmm.guess(musk_tel[[2]], interactive = FALSE, CTMM=ctmm(error=TRUE, dt = dt))
 
-#fit2 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},musk_tel,musk_var_mod_err)
-#saveRDS(fit2, here("output/musk_var_fit2.rds"))
-# fit2 <- readRDS(here("output/musk_var_fit2.rds"))
-# 
-# for (i in 1:length(musk_var)){print(musk_var[[i]]@info$identity);print(summary(fit2[,i])); plot(musk_var[[i]], CTMM = fit2[,i], col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[i]], CTMM = fit2[,i], col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)}
+fit706 <- ctmm.select(musk_tel[[1]],musk_var_mod_err[[1]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit706, here("output/musk_var_fit_err706.rds"))
+fit708 <- ctmm.select(musk_tel[[2]],musk_var_mod_err[[2]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit708, here("output/musk_var_fit_err708.rds"))
+fit7010 <- ctmm.select(musk_tel[[3]],musk_var_mod_err[[3]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit7010, here("output/musk_var_fit_err7010.rds"))
+fit7011 <- ctmm.select(musk_tel[[4]],musk_var_mod_err[[4]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit7011, here("output/musk_var_fit_err7011.rds"))
+fit7012 <- ctmm.select(musk_tel[[5]],musk_var_mod_err[[5]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit7012, here("output/musk_var_fit_err7012.rds"))
+fit7013 <- ctmm.select(musk_tel[[6]],musk_var_mod_err[[6]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit7013, here("output/musk_var_fit_err7013.rds"))
+fit7080 <- ctmm.select(musk_tel[[7]],musk_var_mod_err[[7]],verbose = TRUE,cores = 3, trace = 3)
+saveRDS(fit7080, here("output/musk_var_fit_err7080.rds"))
+
+
+print(musk_var[[1]]@info$identity);print(summary(fit706)); plot(musk_var[[1]], CTMM = fit706, col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[1]], CTMM = fit706, col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)
+print(musk_var[[2]]@info$identity);print(summary(fit708)); plot(musk_var[[2]], CTMM = fit708, col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[2]], CTMM = fit708, col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)
+print(musk_var[[3]]@info$identity);print(summary(fit7010)); plot(musk_var[[3]], CTMM = fit7010, col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[3]], CTMM = fit7010, col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)
+print(musk_var[[4]]@info$identity);print(summary(fit7011)); plot(musk_var[[4]], CTMM = fit7011, col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[4]], CTMM = fit7011, col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)
+print(musk_var[[5]]@info$identity);print(summary(fit7012)); plot(musk_var[[5]], CTMM = fit7012, col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[5]], CTMM = fit7012, col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)
+print(musk_var[[6]]@info$identity);print(summary(fit7013)); plot(musk_var[[6]], CTMM = fit7013, col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var[[6]], CTMM = fit7013, col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)
+
+akde <- akde(musk_tel[[1]],fit706)
+EXT <- extent(akde, level=0.95)
+COL <- color(musk_tel[[1]],by='time')
+plot(musk_tel[[1]],UD=akde,
+     xlim=EXT$x,ylim=EXT$y,
+     col = COL, lwd=4)
 
 ```
 
-
-Let's simulate new data based on the best fitted model for collar 706. 
+Let's simulate new data based on the best fitted model for collar 706.
 
 ```{r}
 #| label: musk_sim
@@ -140,17 +159,17 @@ Let's simulate new data based on the best fitted model for collar 706.
 #| echo: FALSE
 
 set.seed(1)
-musk_sim <- simulate(fit[,1][[1]], t=musk_tel[[1]]$t)
+musk_sim <- simulate(fit7010[[1]], t=musk_tel[[3]]$t)
 var_sim <- variogram(musk_sim)
-plot(var_sim, CTMM = fit[,1][[1]],fraction = 0.65, level = 0.5, col = "blue");title("Simulated 1")
-plot(musk_var[[1]], CTMM = fit[,1][[1]],fraction = 0.65, level = 0.5);title("Real")
-plot(var_sim, CTMM = fit[,1][[1]],xlim = xlim, level = 0.5, col = "blue");title("Simulated")
-plot(musk_var[[1]], CTMM = fit[,1][[1]],xlim = xlim, level = 0.5);title("Real")
+plot(var_sim, CTMM = fit7010[[1]],fraction = 0.5, level = 0.5, col = "blue");title("Simulated 1")
+plot(musk_var[[3]], CTMM = fit7010[[1]],fraction = 0.5, level = 0.5);title("Real")
+plot(var_sim, CTMM = fit7010[[1]],xlim = xlim, level = 0.5, col = "blue");title("Simulated")
+plot(musk_var[[3]], CTMM = fit7010[[1]],xlim = xlim, level = 0.5);title("Real")
 ```
 
-At large time scales, the modelled variogram does not appear to match up very well against the empirical variograms of the simulated and observed data. This is because the errors in the variograms (difference between modelled and empirical) are autocorrelated. Small perturbations are carried forward and can add up over time, but these are not necessarily a bad thing for fitting our model. 
+At large time scales, the modelled variogram does not appear to match up very well against the empirical variograms of the simulated and observed data. This is because the errors in the variograms (difference between modelled and empirical) are autocorrelated. Small perturbations are carried forward and can add up over time, but these are not necessarily a bad thing for fitting our model.
 
-In addition, as the time lag increase, so to does our uncertainty about the estimated semi-variance because larger time lags have fewer pairs of data points to estimate the semi-variance. We have the most certainty at short time lags because we have many pairs of data to estimate uncertainty. It appears as though the simulated variogram is better represented by our current model 
+In addition, as the time lag increase, so to does our uncertainty about the estimated semi-variance because larger time lags have fewer pairs of data points to estimate the semi-variance. We have the most certainty at short time lags because we have many pairs of data to estimate uncertainty. It appears as though the simulated variogram is better represented by our current model
 
 ## Creating Auto Correlated Kernel Density Estimates
 
@@ -170,15 +189,17 @@ for(i in 1:length(akde)){plot(musk_var[[i]], fraction = 1);
        xlim=EXT[[i]]$x,ylim=EXT[[i]]$y,
        col = COL, lwd=4)
   }
-
+ud <- occurrence(musk_tel[[1]],best_fit[[1]])
+plot(musk_tel[[1]],UD=ud,
+       lwd=1)
   
 ```
 
-For the most part, the home range estimates look pretty good, but there are some concerning aspects with clusters of points that look like they represent dispersal events. 706, 7011, 7012, and 7013 all have periods of time (usually at the start or end of the time series) where they moved away from the core home range area. I'm not sure if these are concerning, but some of the odd variograms would suggest they are. 
+For the most part, the home range estimates look pretty good, but there are some concerning aspects with clusters of points that look like they represent dispersal events. 706, 7011, 7012, and 7013 all have periods of time (usually at the start or end of the time series) where they moved away from the core home range area. I'm not sure if these are concerning, but some of the odd variograms would suggest they are.
 
-Another thing to consider is that for some muskoxen, there appears to be some periodicity in their movement, which affects the home rnage estimates. 708 is a good example where the semi-variance decreases at certain times leading to an underestimated variogram model. This causes the fairly conservative home range estimate. 
+Another thing to consider is that for some muskoxen, there appears to be some periodicity in their movement, which affects the home rnage estimates. 708 is a good example where the semi-variance decreases at certain times leading to an underestimated variogram model. This causes the fairly conservative home range estimate.
 
-Lastly, these models don't account for barrier to muskox movement. 7080 in particular has a lake in its home range that it travles around. This is probably why the home range estimate is split into different sections despite the variogram suggesting a range resident individual. 
+Lastly, these models don't account for barrier to muskox movement. 7080 in particular has a lake in its home range that it travles around. This is probably why the home range estimate is split into different sections despite the variogram suggesting a range resident individual.
 
 ```{r, fig.height=4}
 #| dependson: "akde"
@@ -212,8 +233,9 @@ musk_move %>%
   theme_bw()
 ```
 
-There does not appear to be a strong relationship between the days that a collar was active and the size of the home range. The muskox with the second most number of days has the highest home range estimate, but the muskox with the least amount of days has the second highest estimate. 
+There does not appear to be a strong relationship between the days that a collar was active and the size of the home range. The muskox with the second most number of days has the highest home range estimate, but the muskox with the least amount of days has the second highest estimate.
 
+The range of home range sizes overlaps with a study conducted for 11 muskoxen in Bathhurst, Devon, and Cornwallis (233 - 2494 km2; Anderson and Ferguson, 2016). They used minimum convext polygons with up to three years of data for each muskox.
 
 ```{r, fig.height=4}
 #| label: musk_var_cv
@@ -260,4 +282,3 @@ musk_season <- readRDS(here("data/processed/musk_season.rds"))
 
 
 ```
-

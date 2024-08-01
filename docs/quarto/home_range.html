@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.553">
+<meta name="generator" content="quarto-1.4.555">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -187,7 +187,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>First we will plot empirical variograms for each collared muskoxen. Variograms are used to quantify spatial dependence between locations at different points in time. In general, as the time between locations increases, spatial dependence decreases. Variograms plot the semi-variance of distances between pairs of points separated by different time lags. At short time lags, these distances are very similar and the semi-variance is low. At large time lags, there is greater variability in the distances between points, so the semi-variance is high. Usually variograms will reach an asymptote in semi-variance that represents the time lag at which the animal is able to traverse their home range. For now we will leave out the muskoxen that had collar failures as they do not have enough data to estimate home ranges.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_var <span class="ot">&lt;-</span> <span class="fu">lapply</span>(musk_tel, variogram, <span class="at">CI=</span><span class="st">"Gauss"</span>, <span class="at">fast =</span> <span class="cn">FALSE</span>)</span>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_var <span class="ot">&lt;-</span> <span class="fu">lapply</span>(musk_tel, variogram, <span class="at">CI=</span><span class="st">"Gauss"</span>, <span class="at">fast =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>xlim <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">5</span> <span class="sc">%#%</span> <span class="st">"day"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
@@ -401,36 +401,6 @@ OUf anisotropic 1048.6776    0.000000 278.59866</code></pre>
 </div>
 <p>These look okay, but they aren’t capturing the short timescales well in all instances. This could be an issue with these individuals not being range resident, but it could also be related to telemetry error. To try to rectify this, we can attempt to fit models that account for potential error in the telemetry data. Normally, we would want to explicitly include measured error, but since we don’t have those data, we can try to model it. This will partially account for instances where the muskox appeared to have moved between successive time stamps, but really didn’t or instances where the muskox appeared to move between successive time stamps, but really didn’t.</p>
 <p>Let’s simulate new data based on the best fitted model for collar 706.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="home_range_files/figure-html/musk_sim-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="home_range_files/figure-html/musk_sim-2.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="home_range_files/figure-html/musk_sim-3.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="home_range_files/figure-html/musk_sim-4.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
 <p>At large time scales, the modelled variogram does not appear to match up very well against the empirical variograms of the simulated and observed data. This is because the errors in the variograms (difference between modelled and empirical) are autocorrelated. Small perturbations are carried forward and can add up over time, but these are not necessarily a bad thing for fitting our model.</p>
 <p>In addition, as the time lag increase, so to does our uncertainty about the estimated semi-variance because larger time lags have fewer pairs of data points to estimate the semi-variance. We have the most certainty at short time lags because we have many pairs of data to estimate uncertainty. It appears as though the simulated variogram is better represented by our current model</p>
 </section>
@@ -546,6 +516,16 @@ OUf anisotropic 1048.6776    0.000000 278.59866</code></pre>
 </figure>
 </div>
 </div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>ud <span class="ot">&lt;-</span> <span class="fu">occurrence</span>(musk_tel[[<span class="dv">1</span>]],best_fit[[<span class="dv">1</span>]])</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(musk_tel[[<span class="dv">1</span>]],<span class="at">UD=</span>ud,</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>       <span class="at">lwd=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="home_range_files/figure-html/akde-15.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
 </div>
 <p>For the most part, the home range estimates look pretty good, but there are some concerning aspects with clusters of points that look like they represent dispersal events. 706, 7011, 7012, and 7013 all have periods of time (usually at the start or end of the time series) where they moved away from the core home range area. I’m not sure if these are concerning, but some of the odd variograms would suggest they are.</p>
 <p>Another thing to consider is that for some muskoxen, there appears to be some periodicity in their movement, which affects the home rnage estimates. 708 is a good example where the semi-variance decreases at certain times leading to an underestimated variogram model. This causes the fairly conservative home range estimate.</p>
@@ -567,11 +547,12 @@ OUf anisotropic 1048.6776    0.000000 278.59866</code></pre>
 </div>
 </div>
 <p>There does not appear to be a strong relationship between the days that a collar was active and the size of the home range. The muskox with the second most number of days has the highest home range estimate, but the muskox with the least amount of days has the second highest estimate.</p>
+<p>The range of home range sizes overlaps with a study conducted for 11 muskoxen in Bathhurst, Devon, and Cornwallis (233 - 2494 km2; Anderson and Ferguson, 2016). They used minimum convext polygons with up to three years of data for each muskox.</p>
 </section>
 <section id="seasonal-ranges" class="level2">
 <h2 class="anchored" data-anchor-id="seasonal-ranges">Seasonal Ranges</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>musk_season <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/musk_season.rds"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>musk_season <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/musk_season.rds"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 
 

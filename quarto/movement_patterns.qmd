@@ -3,6 +3,9 @@ title: "Movement Patterns"
 editor: visual
 editor_options: 
   chunk_output_type: console
+execute: 
+  warning: false
+  error: false
 ---
 
 ```{r}
@@ -10,6 +13,7 @@ editor_options:
 #| include: false
 
 library(tidyverse)
+library(leaflet)
 library(sf)
 library(here)
 library(terra)
@@ -20,7 +24,14 @@ library(terra)
 #| include: false
 
 musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
-snowdepth_mean <- readRDS(here("data/processed/snowdepth_mean.rds")) 
+snowdepth_mean <- readRDS(here("data/processed/snowdepth_mean.rds"))
+snowdepth_locs <- readRDS(here("data/processed/snowdepth_locs.rds")) %>%
+  left_join(musk_collar_filt %>% 
+              sf::st_drop_geometry() %>%
+              dplyr::select(Id_Number,datetime,Latitude,Longitude) %>% 
+              mutate(flag = "1")) %>%
+  drop_na(flag) %>%
+  distinct(Id_Number,datetime,Latitude,Longitude,geometry,snow_depth,year,month)
 ```
 
 In this document, we will examine patterns in the movement behaviours of collared muskoxen. We will use muskox speed and turning angles to explore behaviour.
@@ -202,7 +213,7 @@ To define seasons, let's use a cut-off of 0.1 m snow depth. We'll define the sta
 #| echo: FALSE
  
 
-musk_season <- snowdepth_mean %>%
+musk_groupseason <- snowdepth_mean %>%
   mutate(year = year(date),
          ### subset entries that match the critera for the start of winter and summer
          date_winter = ifelse(snow_depth>=0.1&
@@ -224,9 +235,7 @@ musk_season <- snowdepth_mean %>%
   ungroup() %>%
   select(date, year, season)
 
-saveRDS(musk_season, here("data/processed/musk_season.rds"))
-
-musk_season %>%
+musk_groupseason %>%
   group_by(year) %>%
   mutate(n = n()) %>%
   filter(month(date)>=7|season=="summer") %>%
@@ -242,6 +251,211 @@ musk_season %>%
   select(-n_diff) %>%
   knitr::kable()
 
+```
+
+We could also look at the movement trajectories of muskoxen at the transitions between seasons to decide on cutoffs specific to each individual. Let's plot the locations of individual muskoxen for each winter, including the transition months of Sept/Oct and Apr/May
+
+```{r, fig.height=6, fig.width=8}
+#| label: musk_mig 
+#| dependson: "load-data"
+#| echo: FALSE
+
+plot_wintrange <- function(id, min_year){
+  
+  musk_mig <- snowdepth_locs %>%
+  filter(Id_Number ==  id,
+         year == min_year & month >= 9|
+         year == (min_year + 1) & month <= 5) %>%
+    mutate(month_flag = ifelse(month==9|month==10, 
+                               "Sep-Oct", 
+                               ifelse(month==4|month==5, "Apr-May", "Winter")),
+           month_flag = factor(month_flag, levels = c("Sep-Oct", "Apr-May", "Winter")))
+
+lc_2010_crop <- terra::rast(here("data/processed/lc_2010_proj.tif")) %>%
+    terra::crop(musk_mig)
+  
+lc_atts <- readRDS(here("data/processed/lc_atts.rds"))
+cols <- as.character(lc_atts$hex)
+names(cols) <- as.character(lc_atts$Classification)
+
+lines <- musk_mig %>%
+  group_by(Id_Number) %>%
+  arrange(datetime) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("LINESTRING")
+
+musk_mig  %>%
+  arrange(rev(snow_depth)) %>%
+  ggplot() +
+  tidyterra::geom_spatraster(data = lc_2010_crop) +
+  geom_sf(data = lines, linewidth = 1) +
+  geom_sf(aes(colour = snow_depth, shape = month_flag), size = 4) +
+  labs(title = str_c(id, " ", year)) +
+  scale_fill_manual(values = cols) +
+  scale_colour_gradient(low = "white", high = "red4")
+}
+
+years <- snowdepth_locs %>%
+  sf::st_drop_geometry() %>%
+  group_by(Id_Number) %>%
+  summarise(min_year = min(year),
+            max_year = max(year) - 1) %>%
+  filter(min_year<=max_year)
+
+for (id in years$Id_Number){
+  id_years <- years %>% filter(Id_Number==id)
+  for(year in id_years$min_year:id_years$max_year){
+    suppressWarnings(print(plot_wintrange(id, year)))
+  }
+}
+
+```
+
+It is clear from these plots that muskoxen tend to head to their winter range once snow starts to accumulate on the ground and leave that range when the snow melts. We can use interactive maps to pinpoint the dates when individuals arrive and leave their winter range. The winter season, along with the transition fall and spring seasons are indicated with different colours.
+
+```{r, fig.height=6, fig.width=8}
+#| label: musk_migstart 
+#| dependson: "load-data"
+#| echo: FALSE
+
+wms_dtm <- "https://datacube.services.geo.ca/ows/mrdem"
+
+musk_migstart <- snowdepth_locs %>%
+  filter(month >= 9|month <= 5) %>%
+  mutate(year_min = ifelse(month>=9,year,year-1))
+
+lines <- musk_migstart %>%
+  group_by(Id_Number, year_min) %>%
+  arrange(datetime) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("LINESTRING")
+
+season_end <- musk_migstart %>%
+  sf::st_drop_geometry() %>%
+  filter(Id_Number==706&datetime%in%as_datetime(c("2008-05-05 00:00:00",
+                                                  "2009-05-02 16:00:00"))|
+         Id_Number==710&datetime%in%as_datetime(c("2008-04-10 16:00:00"))|
+         Id_Number==709&datetime%in%as_datetime(c("2008-03-22 16:00:00"))|
+         Id_Number==707&datetime%in%as_datetime(c("2008-01-10 16:00:00"))|
+         Id_Number==7010&datetime%in%as_datetime(c("2010-01-20 16:00:00",
+                                                   "2009-05-15 00:00:00"))|
+         Id_Number==7011&datetime%in%as_datetime(c("2011-05-21 00:00:00",
+                                                   "2010-04-29 00:00:00",
+                                                   "2009-05-04 00:00:00",
+                                                   "2011-12-21 08:00:00"))|
+         Id_Number==7012&datetime%in%as_datetime(c("2011-05-24 00:00:00",
+                                                   "2010-05-03 08:00:00",
+                                                   "2012-02-19 16:00:00",
+                                                   "2009-05-19 08:00:00"))|
+         Id_Number==7013&datetime%in%as_datetime(c("2011-05-21 16:00:00",
+                                                   "2010-05-11 00:00:00",
+                                                   "2009-05-21 00:00:00"))|
+         Id_Number==708&datetime%in%as_datetime(c("2010-05-06 08:00:00",
+                                                  "2009-05-09 00:00:00",
+                                                  "2010-12-09 08:00:00"))|
+         Id_Number==7080&datetime%in%as_datetime(c("2008-05-10 00:00:00",
+                                                   "2009-05-09 16:00:00"))) %>%
+  rename(season_end = datetime) %>%
+  dplyr::select(Id_Number, year_min, season_end)
+
+season_start <- musk_migstart %>%
+  sf::st_drop_geometry() %>%
+  filter(Id_Number==706&datetime%in%as_datetime(c("2008-10-25 00:00:00",
+                                                  "2007-12-03 16:00:00"))|
+         Id_Number==7010&datetime%in%as_datetime(c("2009-10-22 08:00:00",
+                                                   "2009-02-09 08:00:00"))|
+         Id_Number==710&datetime%in%as_datetime(c("2008-01-20 00:00:00"))|
+         Id_Number==709&datetime%in%as_datetime(c("2008-01-20 00:00:00"))|
+         Id_Number==707&datetime%in%as_datetime(c("2007-12-03 16:00:00"))|
+         Id_Number==7011&datetime%in%as_datetime(c("2010-11-14 00:00:00",
+                                                   "2009-11-18 00:00:00",
+                                                   "2009-02-04 08:00:00",
+                                                   "2011-09-28 00:00:00"))|
+         Id_Number==7012&datetime%in%as_datetime(c("2011-10-26 08:00:00",
+                                                   "2010-11-26 16:00:00",
+                                                   "2009-10-20 16:00:00",
+                                                   "2009-02-08 00:00:00"))|
+         Id_Number==7013&datetime%in%as_datetime(c("2010-11-26 16:00:00",
+                                                   "2009-10-17 00:00:00",
+                                                   "2009-02-17 00:00:00"))|
+         Id_Number==708&datetime%in%as_datetime(c("2009-10-25 00:00:00",
+                                                  "2009-02-24 00:00:00",
+                                                  "2010-11-16 16:00:00"))|
+         Id_Number==7080&datetime%in%as_datetime(c("2007-12-03 16:00:00",
+                                                   "2008-10-18 08:00:00")))%>%
+  rename(season_start = datetime) %>%
+  dplyr::select(Id_Number, year_min, season_start)
+
+musk_wint <- musk_migstart %>%
+  left_join(season_start) %>%
+  left_join(season_end) %>%
+  mutate(season = ifelse(datetime<season_start,"Fall",
+                         ifelse(datetime>=season_end,"Spring",
+                                ifelse(month>=4&month<7,"Calving","Winter"))))
+
+pal <- colorFactor(
+  palette = c('red', 'blue', 'green', 'yellow'),
+  domain = musk_wint$season
+)
+
+
+musk_wint %>%
+  leaflet() %>%
+  addPolylines(data = lines,
+               group = ~Id_Number) %>%
+  addCircles(color = ~pal(season),
+             label = ~ Id_Number,
+             popup = ~paste(datetime),
+             group = ~Id_Number) %>%
+  addTiles() %>%
+  addLayersControl(
+    overlayGroups = ~unique(Id_Number),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(pal=pal, values = ~season)
+  ### remember to specify the WMS version or it won't load
+  # addWMSTiles(wms_dtm, layers = "dsm",
+  #              options = WMSTileOptions(format = "image/png",
+  #                                       transparent = TRUE, version = "1.3.0"))
+
+
+```
+
+```{r}
+#| label: musk_migstart 
+#| dependson: "load-data"
+#| echo: FALSE
+
+musk_season <- musk_collar_filt %>%
+  ## create year_min to match with season start and end dates
+  mutate(year_min = ifelse(month>=6,year,year-1)) %>%
+  left_join(season_start) %>%
+  left_join(season_end) %>%
+  mutate(season = case_when(
+    month>=6&month<=8~"Summer",
+    datetime<season_start~"Summer",
+    datetime>=season_end~"Summer",
+    month>=4&month<=5~"Calving",
+    TRUE~"Winter")) %>%
+  dplyr::select(-year_min)
+  
+
+saveRDS(musk_season, here("data/processed/musk_season.rds"))
+
+musk_season %>%
+  sf::st_drop_geometry() %>%
+  mutate(date = as.Date(datetime)) %>%
+  distinct(Id_Number,date,season) %>%
+  mutate(year_min = ifelse(season == "Winter"&month(date)<6,
+                           year(date)-1,year(date))) %>%
+  group_by(year_min, season, Id_Number) %>%
+  summarise(start = min(date),
+            end = max(date),
+            length = end - start) %>%
+  ungroup() %>%
+  ggplot(aes(x = year_min, y = length, colour = Id_Number)) +
+  geom_point(size = 3) +
+  facet_wrap(~season)
 ```
 
 ## Muskox Calving

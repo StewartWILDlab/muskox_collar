@@ -25,3 +25,11 @@ download.file(meta_url, "data/raw/landcover/landcover-2010-classification.tif2.x
 names_url <- "https://ftp.cartes.canada.ca/pub/nrcan_rncan/vector/geobase_cgn_toponyme/prov_shp_eng/cgn_nt_shp_eng.zip"
 download.file(names_url, "data/raw/nwt_names/nwt_names.zip")
 unzip("data/raw/nwt_names/nwt_names.zip", exdir = "data/raw/nwt_names")
+
+
+### download Medium Resolution Digital Elevation Model (MRDEM) from Govt of Canada
+dtm_url <- "https://datacube-prod-data-public.s3.ca-central-1.amazonaws.com/store/elevation/mrdem/mrdem-30/mrdem-30-dtm.tif"
+options(timeout = max(2000, getOption("timeout")))
+download.file(dtm_url, "data/raw/MRDEM/mrdtm.tif")
+temp <- terra::rast(dtm_url)
+

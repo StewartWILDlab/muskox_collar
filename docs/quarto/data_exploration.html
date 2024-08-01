@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.553">
+<meta name="generator" content="quarto-1.4.555">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -152,6 +152,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text">Home Range</span></a>
   </div>
 </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../quarto/seasonal_range.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Seasonal Range</span></a>
+  </div>
+</li>
     </ul>
     </div>
 </nav>
@@ -186,8 +192,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>We can plot the date ranges of individual collared muskoxen below:</p>
 <div class="cell">
 <div class="cell-output-display">
-<div>
-<table class="table table-sm table-striped small" data-quarto-postprocess="true">
+<table class="table caption-top table-sm table-striped small" data-quarto-postprocess="true">
 <thead>
 <tr class="header">
 <th style="text-align: left;" data-quarto-table-cell-role="th">Id_Number</th>
@@ -252,7 +257,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 </div>
 </div>
-</div>
 <p>Muskoxen 707, 709, 710, and 7010 have less than a year of movement data and only 7011, 7012, and 7013 have more than 2 years of data.</p>
 </section>
 <section id="collar-failure" class="level2">
@@ -280,7 +284,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>For simplicity, let’s remove all points following the first two consecutive short step lengths (i.e.&nbsp;0 or 4.4747041) at the end of the time series.</p>
 <div class="cell">
 <div class="cell-output-display">
-<table class="table table-sm table-striped small">
+<table class="caption-top table table-sm table-striped small">
 <thead>
 <tr class="header">
 <th style="text-align: left;">Id_Number</th>
@@ -419,7 +423,7 @@ ddfilter removed 2 locations (0.01% of original data)</code></pre>
 <p>Lastly, we will remove any points collected within 24 hours of collar deployments to remove the immediate effects of capture and handling.</p>
 <div class="cell">
 <div class="cell-output-display">
-<table class="table table-sm table-striped small">
+<table class="caption-top table table-sm table-striped small">
 <thead>
 <tr class="header">
 <th style="text-align: left;">Id_Number</th>

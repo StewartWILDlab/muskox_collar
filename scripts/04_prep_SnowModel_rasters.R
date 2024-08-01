@@ -48,15 +48,96 @@ writeCDF(sm_2010_crop, "data/processed/sm_2010_crop.nc", overwrite = TRUE)
 writeCDF(sm_2011_crop, "data/processed/sm_2011_crop.nc", overwrite = TRUE)
 writeCDF(sm_2012_crop, "data/processed/sm_2012_crop.nc", overwrite = TRUE)
 
-### Calculate per day averages for snow depth across the stusy area
+sm_2007_crop <- terra::rast("data/processed/sm_2007_crop.nc", 
+                       drivers="NETCDF")
+sm_2008_crop <- terra::rast("data/processed/sm_2008_crop.nc", 
+                       drivers="NETCDF")
+sm_2009_crop <- terra::rast("data/processed/sm_2009_crop.nc", 
+                       drivers="NETCDF")
+sm_2010_crop <- terra::rast("data/processed/sm_2010_crop.nc", 
+                       drivers="NETCDF")
+sm_2011_crop <- terra::rast("data/processed/sm_2011_crop.nc", 
+                       drivers="NETCDF")
+sm_2012_crop <- terra::rast("data/processed/sm_2012_crop.nc", 
+                       drivers="NETCDF")
+### Calculate per day averages for snow depth across the study area
 
-snowdepth_mean <- global(sm_2007_crop, "mean") %>%
-  bind_rows(global(sm_2008_crop, "mean")) %>%
-  bind_rows(global(sm_2009_crop, "mean")) %>%
-  bind_rows(global(sm_2010_crop, "mean")) %>%
-  bind_rows(global(sm_2011_crop, "mean")) %>%
-  bind_rows(global(sm_2012_crop, "mean")) %>%
+### Rasterize the muskox collar points to create zones for zonal statistics
+zones <- rasterize(musk_collar %>%
+                    sf::st_transform(terra::crs(sm_2008)),
+                  sm_2007_crop, fun = "first")
+
+snowdepth_mean <- zonal(sm_2007_crop, zones, "mean", wide = FALSE) %>%
+  bind_rows(zonal(sm_2008_crop, zones, "mean", wide = FALSE)) %>%
+  bind_rows(zonal(sm_2009_crop, zones, "mean", wide = FALSE)) %>%
+  bind_rows(zonal(sm_2010_crop, zones, "mean", wide = FALSE)) %>%
+  bind_rows(zonal(sm_2011_crop, zones, "mean", wide = FALSE)) %>%
+  bind_rows(zonal(sm_2012_crop, zones, "mean", wide = FALSE)) %>%
   mutate(date = seq( as.Date("2007-01-01"), as.Date("2012-12-31"), by="+1 day"),
-         snow_depth = round(mean,2))
+         snow_depth = round(value,2)) %>%
+  select(date, snow_depth, value)
 
 saveRDS(snowdepth_mean, "data/processed/snowdepth_mean.rds")
+
+
+### create a column for snow depth for each GPS relocation
+
+temp <- terra::extract(sm_2007_crop, 
+                       musk_collar %>%
+                  sf::st_transform(terra::crs(sm_2008_crop))) %>%
+  pivot_longer(-ID, names_to = c(NA, "year", NA, "day"),
+               names_sep = "_", values_to = "snow_depth") %>%
+  bind_rows(
+    terra::extract(sm_2008_crop, 
+                   musk_collar %>%
+                     sf::st_transform(terra::crs(sm_2008_crop))) %>%
+      pivot_longer(-ID, names_to = c(NA, "year", NA, "day"),
+                   names_sep = "_", values_to = "snow_depth")
+  ) %>%
+  bind_rows(
+    terra::extract(sm_2009_crop, 
+                   musk_collar %>%
+                     sf::st_transform(terra::crs(sm_2008_crop))) %>%
+      pivot_longer(-ID, names_to = c(NA, "year", NA, "day"),
+                   names_sep = "_", values_to = "snow_depth")
+  )%>%
+  bind_rows(
+    terra::extract(sm_2010_crop, 
+                   musk_collar %>%
+                     sf::st_transform(terra::crs(sm_2008_crop))) %>%
+      pivot_longer(-ID, names_to = c(NA, "year", NA, "day"),
+                   names_sep = "_", values_to = "snow_depth")
+  )%>%
+  bind_rows(
+    terra::extract(sm_2011_crop, 
+                   musk_collar %>%
+                     sf::st_transform(terra::crs(sm_2008_crop))) %>%
+      pivot_longer(-ID, names_to = c(NA, "year", NA, "day"),
+                   names_sep = "_", values_to = "snow_depth")
+  )%>%
+  bind_rows(
+    terra::extract(sm_2012_crop, 
+                   musk_collar %>%
+                     sf::st_transform(terra::crs(sm_2008_crop))) %>%
+      pivot_longer(-ID, names_to = c(NA, "year", NA, "day"),
+                   names_sep = "_", values_to = "snow_depth")
+  ) %>%
+  group_by(ID) %>%
+  mutate(date2 = seq( as.Date("2007-01-01"), 
+                     as.Date("2012-12-31"), 
+                     by="+1 day")) %>%
+  group_by(date2) %>%
+  arrange(ID) %>%
+  mutate(Id_Number = musk_collar$Id_Number,
+         datetime = musk_collar$datetime,
+         Date = musk_collar$Date) %>%
+  filter(Date == date2) %>%
+  ungroup() %>%
+  select(Id_Number, datetime, snow_depth)
+snowdepth_locs <- musk_collar %>%
+  ungroup() %>%
+  mutate(snow_depth = temp$snow_depth)
+
+saveRDS(snowdepth_locs, "data/processed/snowdepth_locs.rds")
+
+  
