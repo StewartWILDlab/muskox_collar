@@ -4,6 +4,9 @@ format: html
 editor: visual
 editor_options: 
   chunk_output_type: console
+execute: 
+  warning: false
+  error: false
 ---
 
 ```{r}
@@ -18,42 +21,53 @@ library(adehabitatHR)
 
 ```{r}
 #| label: load-data
+#| echo: false
 
 musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
 musk_season <- readRDS(here("data/processed/musk_season.rds")) 
 musk_collar_cal <- readRDS(here("data/processed/musk_collar_cal.rds"))
 ```
 
-Using Brownian Bridge Movement Model from the adehabitatHR package to estimate seasonal ranges for each muskoxen. Summer and winter are separated based on the presence of snow \>0.1m deep for three consecutive days (see Movement Patterns).
+Using Brownian Bridge Movement Model from the adehabitatHR package to estimate seasonal ranges for each muskoxen. Summer and winter/calving are separated based on presence of snow and movement behaviours (see Movement Patterns). First let's look at how long each season is for each muskoxen.
 
-```{r}
-#| label: snow_seas
+```{r, fig.height=6, fig.width=8}
+#| label: season_length
 
-musk_collar_seas <- musk_season %>%
+musk_season_length <- musk_season %>%
   mutate(date = as.Date(datetime),
-         year_min = ifelse(season=="Winter"&month<=5,year-1,year)) %>%
-  mutate(range_id = str_c(Id_Number,"_",year_min,"_",season)) %>%
-  group_by(range_id) %>%
-  filter(season == "Calving"&length(unique(date)) >= 30|
-           season == "Winter"&length(unique(date)) >= 60|
-           season == "Summer"&length(unique(date)) >= 90) %>%
-  ungroup() %>%
-  mutate(range_id = factor(range_id),
-         season = factor(season, levels = c("Summer", "Winter", "Calving"))) %>%
-  arrange(range_id)
-
-musk_collar_seas %>%
-  sf::st_drop_geometry() %>%
+         year_min = ifelse(season=="Winter"&month<=5,year-1,year),
+         season = factor(season, 
+                         levels = c("Summer", "Winter", "Calving"))) %>%
   group_by(Id_Number, year_min, season) %>%
-  summarise(days = length(unique(date))) %>%
-  pivot_wider(names_from = season, values_from = days) %>%
-  knitr::kable()
+  mutate(seas_length = max(date)-min(date)) %>%
+  ungroup()
+
+musk_season_length %>%
+  sf::st_drop_geometry() %>%
+  distinct(Id_Number, year_min, season, seas_length) %>%
+  ggplot(aes(x = Id_Number, y = seas_length, colour = factor(year_min))) +
+  geom_point(size = 3) +
+  geom_hline(
+    data = tibble(season = factor(c("Summer", "Winter", "Calving")),
+                    y = c(120,90,30)),
+    aes(yintercept = y)) +
+  facet_wrap(~season)
 ```
 
-Number of locations for each muskox-season combination.
+Some seasons are pretty short, due to the season overlapping the start or end of the monitoring period for that individuals. Let's start by setting a cut-off for each season to be included in this analysis. Since muskoxen are moving around a lot in the summer, we'll specify that we want at least four months of data (120 days). Summer usually goes from mid-May to end of October, so this cut-off assumes we have locations for roughly 80% of the period. Muskoxen are moving around less during the winter and calving seasons, so we will use cutoff of three and one month(s) (90 and 30 days). Winter typically lasts from end of October to our cutoff of April 1st and calving goes until mid May. This ensures roughly 60% of the season is included for winter and calving. Later we'll compare different lengths of data to see the effect on home range estimates.
 
 ```{r}
 #| label: musk_ltraj
+
+musk_collar_seas <- musk_season_length %>%
+  mutate(range_id = str_c(Id_Number,"_",year_min,"_",season)) %>%
+  group_by(range_id) %>%
+  filter(season == "Calving"&seas_length >= 30|
+           season == "Winter"&seas_length >= 90|
+           season == "Summer"&seas_length >= 120) %>%
+  ungroup() %>%
+  mutate(range_id = factor(range_id)) %>%
+  arrange(range_id)
 
 xy <- musk_collar_seas %>%
   sf::st_transform("+proj=utm +zone=9") %>%
@@ -62,14 +76,14 @@ musk_ltraj <- adehabitatLT::as.ltraj(xy = xy, date = musk_collar_seas$datetime, 
 
 ```
 
-First step is to determine GPS accuracy using stationary GPS data. We can use data from collar 707 as this collar was confirmed to have released early. We will calculate the standard deviation of the euclidean distances to estimate GPS accuracy. This will be used as sig2 to help fit our movement models.
+Our first step towards creating seasonal home ranges is to determine GPS accuracy using stationary GPS data. We can use data from collar 707 as this collar was confirmed to have released early. We will calculate the standard deviation of the euclidean distances to estimate GPS accuracy. This will be used as the sig2 parameter in our models and can be used to help estimate the other model parameter, sig1, which is related to home range size.
 
 We can then fit movement models for each muskox for each season and estimate utilization distributions. From these distributions we can compare size and overlap between seasons, years, and muskoxen.
 
 Below we plot an example seasonal range as well as a comparison between 90% seasonal ranges and 50% core seasonal ranges for each season.
 
 ```{r}
-#| label: sig1_est
+#| label: sig1
 
 sig2 <- musk_collar_cal %>%
   sf::st_transform("+proj=utm +zone=9") %>%
@@ -90,6 +104,13 @@ sig1 <- liker(musk_ltraj,
               sig2 = sig2, 
               rangesig1 = c(0.1,20),
               plotit = FALSE)
+
+
+```
+
+```{r}
+
+#| label: musk_bb
 
 # bbox <- musk_collar_seas %>%
 #   sf::st_transform("+proj=utm +zone=9") %>%

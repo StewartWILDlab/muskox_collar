@@ -422,7 +422,7 @@ musk_wint %>%
 ```
 
 ```{r}
-#| label: musk_migstart 
+#| label: musk_season2 
 #| dependson: "load-data"
 #| echo: FALSE
 
