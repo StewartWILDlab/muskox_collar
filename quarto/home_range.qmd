@@ -175,6 +175,8 @@ Given that the start and end of the sampling period for each muskox can bias the
 
 ```{r}
 #| label: musk_tel_sub
+#| dependson: "load-data"
+#| output: FALSE
 
 musk_move_sub <- musk_move %>%
   mutate(timestamp = as.POSIXct(timestamp)) %>%
@@ -198,29 +200,18 @@ dt <- c(8,24) %#% "hour"
 musk_var_sub[[2]] <- variogram(musk_tel_sub[[2]], dt = dt, CI="Gauss", fast = FALSE)
 musk_var_sub[[3]] <- variogram(musk_tel_sub[[3]], dt = dt, CI="Gauss", fast = FALSE)
 
-map(musk_var_sub, function(x) x %>% as_tibble() %>% mutate(id = x@info$identity)) %>% 
-  list_rbind() %>%
-  group_by(id) %>%
-  slice(seq(0.5 * n())) %>%
-  ungroup() %>%
-  mutate(level = 0.95,
-         lag = lag/(24*60*60),
-         ci.lower = SVF*qchisq((1-level)/2,DOF,lower.tail=TRUE)/DOF,
-         ci.upper = SVF*qchisq((1-level)/2,DOF,lower.tail=FALSE)/DOF) %>%
-  ggplot(aes(x = lag, y = SVF)) +
-  geom_linerange(aes(ymin = ci.lower, ymax = ci.upper), colour = "grey") +
-  geom_line() +
-  facet_wrap(~id, scales = "free_y") +
-  theme_bw()
+```
 
+```{r}
+#| label: musk_sub_mod
+#| dependson: "musk_tel_sub"
+#| 
 ### fist create a best guess set of parameters for the model
 musk_sub_mod <- lapply(musk_var_sub, variogram.fit, interactive = FALSE)
 # fit3 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},musk_tel_sub,musk_sub_mod)
 # saveRDS(fit3, here("output/musk_sub_fit.rds"))
 fit3 <- readRDS(here("output/musk_sub_fit.rds"))
 for (i in 1:length(musk_var)){print(musk_var_sub[[i]]@info$identity);print(summary(fit3[,i])); plot(musk_var_sub[[i]], CTMM = fit3[,i], col.CTMM=c("red","purple","blue", "green"),fraction=0.5,level=0.5);plot(musk_var_sub[[i]], CTMM = fit3[,i], col.CTMM=c("red","purple","blue", "green"),xlim = xlim,,level=0.5)}
-
-
 ```
 
 These look better overall. The variogram for 7012 still appears to be increasing but the other ones are relatively stable.
@@ -231,7 +222,7 @@ To illustrate the variability of empirical variograms over long time periods, le
 
 ```{r}
 #| label: musk_sim
-#| dependson: "musk_var_mod"
+#| dependson: "musk_sub_mod"
 #| echo: FALSE
 
 for(i in 1:length(musk_tel_sub)){
@@ -259,7 +250,7 @@ We can use kernel density estimates that account for these underlying movement m
 
 ```{r, fig.height=4}
 #| label: akde
-#| dependson: "musk_var_mod"
+#| dependson: "musk_sub_mod"
 
 best_fit <- fit3[1,]
 akde <- mapply(function(x,y){akde(x,y)},musk_tel_sub,best_fit)
