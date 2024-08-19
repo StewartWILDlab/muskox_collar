@@ -38,9 +38,10 @@ musk_season_length <- musk_season %>%
          year_min = ifelse(season=="Winter"&month<=5,year-1,year),
          season = factor(season, 
                          levels = c("Summer", "Winter", "Calving"))) %>%
+  drop_na(season) %>%
   group_by(Id_Number, year_min, season) %>%
   mutate(seas_length = max(date)-min(date)) %>%
-  ungroup()
+  ungroup() 
 
 musk_season_length %>%
   sf::st_drop_geometry() %>%
@@ -60,7 +61,10 @@ Some seasons are pretty short, due to the season overlapping the start or end of
 #| label: musk_ltraj
 
 musk_collar_seas <- musk_season_length %>%
-  mutate(range_id = str_c(Id_Number,"_",year_min,"_",season)) %>%
+  ### create groupings for muskoxen (7012 and 7013 overlap but the rest are separated)
+  mutate(range_id = str_c(Id_Number,"_",year_min,"_",season),
+         group = ifelse(Id_Number %in% c(7012,7013),
+                        "7012_13", str_c(Id_Number))) %>%
   group_by(range_id) %>%
   filter(season == "Calving"&seas_length >= 30|
            season == "Winter"&seas_length >= 90|
@@ -109,41 +113,95 @@ sig1 <- liker(musk_ltraj,
 ```
 
 ```{r}
-
 #| label: musk_bb
 
-# bbox <- musk_collar_seas %>%
-#   sf::st_transform("+proj=utm +zone=9") %>%
-#   mutate(x = sf::st_coordinates(geometry)[,1],
-#          y = sf::st_coordinates(geometry)[,2]) %>%
-#   st_drop_geometry() %>%
-#   group_by(range_id) %>%
-#   summarise(xmin = min(x),
-#          xmax = max(x),
-#          ymin = min(y),
-#          ymax = max(y)) 
-# 
-# sp_pixels = list()
-# for(i in 1:nrow(bbox)){
-#   coords <- expand.grid(x = seq(bbox$xmin[i]-50,bbox$xmax[i]+10,100),
-#                       y = seq(bbox$ymin[i]-10,bbox$ymax[i]+10,100))
-#   sf_points <- st_as_sf(coords, coords = c("x", "y"), crs = "+proj=utm +zone=9")
-#   sp_points <- as(sf_points, "Spatial")
-#   sp_pixels[[i]] <- SpatialPixels(sp_points)
-# }
+bbox <- musk_collar_seas %>%
+  sf::st_transform("+proj=utm +zone=9") %>%
+  mutate(x = sf::st_coordinates(geometry)[,1],
+         y = sf::st_coordinates(geometry)[,2]) %>%
+  st_drop_geometry()  %>%
+  group_by(group) %>%
+  summarise(xmin = min(x),
+         xmax = max(x),
+         ymin = min(y),
+         ymax = max(y))
 
+sp_pixels = list()
+for(i in 1:nrow(bbox)){
+  coords <- expand.grid(x = seq(bbox$xmin[i]-5000,bbox$xmax[i]+5000,100),
+                      y = seq(bbox$ymin[i]-5000,bbox$ymax[i]+5000,100))
+  sf_points <- st_as_sf(coords, coords = c("x", "y"), crs = "+proj=utm +zone=9")
+  sp_points <- as(sf_points, "Spatial")
+  sp_pixels[[bbox$group[i]]] <- SpatialPixels(sp_points)
+}
 
 musk_bb <- list()
-for(i in 1:length(sig1)){
-  musk_bb[[i]] <- kernelbb(musk_ltraj[i],
-                           sig1 = sig1[[i]]$sig1,
-                           sig2 = sig2,
-                           grid=100) 
+lookup <- musk_collar_seas %>%
+  st_drop_geometry() %>%
+  dplyr::select(range_id, group) %>%
+  distinct()
+# for(i in 1:length(sig1)){
+#   musk_bb[[i]] <- kernelbb(musk_ltraj[i],
+#                            sig1 = sig1[[i]]$sig1,
+#                            sig2 = sig2,
+#                            grid=sp_pixels[[lookup$group[i]]])
+# }
+# saveRDS(musk_bb, here("data/processed/musk_bb.rds"))
+musk_bb <- readRDS(here("data/processed/musk_bb.rds"))  
+
+
+```
+
+Let's take a look at the contour plots for each individual to make sure they look okay:
+
+```{r, fig.height=6, fig.width=8}
+#| label: musk_seascont
+#| dependson: "musk_bb"
+#| echo: false
+
+musk_seascont <- map(musk_bb, function(x){getverticeshr(x,95) %>% st_as_sf()}) %>%
+  list_rbind() %>%
+  st_as_sf() %>%
+  mutate(range_id = unique(musk_collar_seas$range_id)) %>%
+  left_join(musk_collar_seas %>% 
+              sf::st_drop_geometry() %>%
+              dplyr::select(range_id,Id_Number,year_min,season) %>% 
+              distinct()) %>%
+  mutate(season = factor(season, levels = c("Summer","Winter","Calving")))
+basemaps::set_defaults(map_service = "osm", map_type = "topographic")
+for(i in unique(musk_collar_seas$Id_Number)){
+  data <- musk_seascont %>%
+    filter(Id_Number == i) %>%
+    st_set_crs("+proj=utm +zone=9") %>%
+    st_transform(3857) %>%
+    arrange(season)
+  plot <- data %>%
+    ggplot() +
+    basemaps::basemap_gglayer(data) +
+    coord_sf() +
+    scale_fill_identity() +
+    ggnewscale::new_scale_fill() +
+     # geom_sf(data = musk_collar_seas %>% 
+     #           filter(Id_Number == 7010) %>%
+     #           sf::st_transform("+proj=utm +zone=9"),
+     #         alpha = 0.5) +
+    geom_sf(aes(fill = interaction(factor(year_min),season)),
+            colour = NA,
+            alpha = 1) +
+    scale_fill_viridis_d()+
+    labs(title = str_c(i), fill = "Season Year")
+  print(plot)
 }
-  
-image(musk_bb[[1]]);plot(getverticeshr(musk_bb[[1]], 95), add=TRUE, lwd=2)
-plot(musk_ltraj[1])
-kernel.area(musk_bb[[1]],percent = c(50,95),unout = "km2")
+
+
+```
+
+These look reasonable. Let's also plot the seasonal range sizes to compare between individuals and years:
+
+```{r, fig.height=6, fig.width=10}
+#| label: musk_seasrange
+#| dependson: "musk_bb"
+#| echo: false
 
 musk_seasrange <- map(musk_bb, function(x){kernel.area(x,percent = c(50,95),unout = "km2") %>% as_tibble_row()}) %>%
   list_rbind() %>%
@@ -163,3 +221,95 @@ musk_seasrange %>%
   geom_point(size = 3) +
   facet_wrap(~season, scales = "free")
 ```
+
+There are some large ranges in 2009, particularly for 7011 (summer and calving), 7010 winter, 7012 calving, and 708 winter.
+
+## Range Overlap
+
+We will now use the `kerneloverlap` function to investigate the degree of overlap between seasonal ranges within the same year and between years. This function implements a number of overlap metrics that are well suited to measuring overlap of utilization distributions. Consequently, we can explore not only overlap between contours of a given size, but also the degree to which high probability regions of ranges overlap. For example the `PHR` function calculates the probability of an individual from one home range being found in another home range.
+
+```{r}
+#| label: musk_overlap
+#| dependson: "musk_bb"
+
+
+overlap_func <- function(group){
+  rows = which(lookup$group == group)
+  temp <- musk_bb[rows]
+  class(temp) <- "estUDm"
+  poverlap <- kerneloverlaphr(temp, method = "HR") %>%
+    as_tibble(.name_repair = "unique") %>%
+    setNames(lookup$range_id[rows]) %>%
+    mutate(range_id = lookup$range_id[rows],
+           metric = "Percent Overlap") %>%
+    pivot_longer(1:length(rows), 
+                 names_to = "range_id_compare", 
+                 values_to = "value")
+  volume <- kerneloverlaphr(temp, method = "PHR") %>%
+    as_tibble(.name_repair = "unique") %>%
+    setNames(lookup$range_id[rows]) %>%
+    mutate(range_id = lookup$range_id[rows],
+           metric = "Volume of UD") %>%
+    pivot_longer(1:length(rows), 
+                 names_to = "range_id_compare", 
+                 values_to = "value") %>%
+    mutate(value = round(value,3))
+  overlap <- bind_rows(poverlap,volume)  
+}
+
+musk_overlap <- map(unique(lookup$group), function(.x){overlap_func(.x)}) %>%
+  list_rbind() %>%
+  filter(range_id != range_id_compare) %>%
+  left_join(musk_collar_seas %>% 
+              st_drop_geometry() %>%
+              dplyr::select(range_id, Id_Number, year_min, season) %>%
+              distinct(),
+            by = c("range_id_compare" = "range_id")) %>%
+  rename(Id_Number_compare = Id_Number,
+         year_min_compare = year_min,
+         season_compare = season) %>%
+  left_join(musk_collar_seas %>% 
+              st_drop_geometry() %>%
+              dplyr::select(range_id, Id_Number, year_min, season) %>%
+              distinct())
+```
+
+Let's plot the overlap metrics. The first graph shows the percent overlap of an individual's 95% home range contour from different seasons and years. Home rqanges represented by columns are compared against home ranges represented by rows and separated by different year lags.
+
+The second graph depicts the probability that an individual with a utilization distribution represented by the row is found in the 95% home range contour represented by the column.
+
+```{r}
+#| label: musk_overlap_plot
+#| dependson: "musk_overlap_plot"
+#| echo: false
+
+musk_overlap %>%
+  filter(metric == "Percent Overlap",
+         Id_Number == Id_Number_compare) %>%
+  mutate(year_diff = year_min_compare - year_min) %>%
+  ggplot(aes(x = factor(year_diff), y = value)) +
+  geom_boxplot() +
+  facet_grid(season~season_compare) +
+  ylab("Percent overlap of home ranges") +
+  xlab("Year lag")
+
+musk_overlap %>%
+  filter(metric == "Volume of UD",
+         Id_Number == Id_Number_compare) %>%
+  mutate(year_diff = year_min_compare - year_min) %>%
+  ggplot(aes(x = factor(year_diff), y = value)) +
+  geom_boxplot() +
+  facet_grid(season~season_compare) +
+  ylab("Probability of finding individual in home range") +
+  xlab("Year lag")
+```
+
+A few patterns are clear from these graphs:
+
+-   Summer home ranges shared \~40% of their area across years.
+
+-   Winter and calving home ranges typically shared a high overlap with summer ranges, especially those from the same year. However, there was a lot of variation in this overlap, with some seasons having near 100% overlap and some having very little overlap.
+
+-   Calving season ranges shared a high overlap with the winter season range immediately preceding it, but there was considerable variation in this overlap.
+
+-   Winter and calving season ranges showed negligible overlap across years, suggesting low seasonal range fidelity.

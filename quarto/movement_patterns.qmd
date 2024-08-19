@@ -333,11 +333,11 @@ lines <- musk_migstart %>%
 season_end <- musk_migstart %>%
   sf::st_drop_geometry() %>%
   filter(Id_Number==706&datetime%in%as_datetime(c("2008-05-05 00:00:00",
-                                                  "2009-05-02 16:00:00"))|
-         Id_Number==710&datetime%in%as_datetime(c("2008-04-10 16:00:00"))|
-         Id_Number==709&datetime%in%as_datetime(c("2008-03-22 16:00:00"))|
-         Id_Number==707&datetime%in%as_datetime(c("2008-01-10 16:00:00"))|
-         Id_Number==7010&datetime%in%as_datetime(c("2010-01-20 16:00:00",
+                                                  "2009-05-01 16:00:00"))|
+         Id_Number==710&datetime%in%as_datetime(c("2008-04-09 16:00:00"))|
+         Id_Number==709&datetime%in%as_datetime(c("2008-03-21 16:00:00"))|
+         Id_Number==707&datetime%in%as_datetime(c("2008-01-09 16:00:00"))|
+         Id_Number==7010&datetime%in%as_datetime(c("2010-01-19 16:00:00",
                                                    "2009-05-15 00:00:00"))|
          Id_Number==7011&datetime%in%as_datetime(c("2011-05-21 00:00:00",
                                                    "2010-04-29 00:00:00",
@@ -345,7 +345,7 @@ season_end <- musk_migstart %>%
                                                    "2011-12-21 08:00:00"))|
          Id_Number==7012&datetime%in%as_datetime(c("2011-05-24 00:00:00",
                                                    "2010-05-03 08:00:00",
-                                                   "2012-02-19 16:00:00",
+                                                   "2012-02-18 16:00:00",
                                                    "2009-05-19 08:00:00"))|
          Id_Number==7013&datetime%in%as_datetime(c("2011-05-21 16:00:00",
                                                    "2010-05-11 00:00:00",
@@ -433,10 +433,10 @@ musk_season <- musk_collar_filt %>%
   left_join(season_end) %>%
   mutate(season = case_when(
     month>=6&month<=8~"Summer",
-    datetime<season_start~"Summer",
-    datetime>=season_end~"Summer",
-    month>=4&month<=5~"Calving",
-    TRUE~"Winter")) %>%
+    datetime>=season_start&(month<4|month>=9)~"Winter",
+    month>=4&datetime<=season_end&month<=5~"Calving",
+    month>=5&month<=11~"Summer",
+    TRUE~NA)) %>%
   dplyr::select(-year_min)
   
 
