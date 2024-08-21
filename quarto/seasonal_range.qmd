@@ -13,10 +13,11 @@ execute:
 #| label: load-packages
 #| include: false
 
-library(tidyverse)
 library(sf)
 library(here)
 library(adehabitatHR)
+library(tidyverse)
+
 ```
 
 ```{r}
@@ -335,3 +336,7 @@ musk_overlap %>%
 ```
 
 The highest overlap is during the summer. These muskoxen do not appear to share large areas during the winter or calving season and despite being found in the same location occasionally, they appeared to wander on their own for most of the time they were collared.
+
+## Determinants of Home Range Size
+
+Now we will look to model variables that are likely to influence the size of home ranges. Since we have few observations per season (sample size 12 - 15), we want 1 - 2 explantory variables per season model. Average snow cover during the winter and calving seasons may impact home range size, with individuals being restricted from moving large distances. During the summer, the percent of landcover suitable for foraging or number of foraging patches may impact the size of home ranges with larger home ranges occurring when individuals need to travel more often or further to get to foraging areas. Other barriers to movement may also affect home range size, including ridges and lakes.
