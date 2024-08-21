@@ -280,7 +280,7 @@ The second graph depicts the probability that an individual with a utilization d
 
 ```{r}
 #| label: musk_overlap_plot
-#| dependson: "musk_overlap_plot"
+#| dependson: "musk_overlap"
 #| echo: false
 
 musk_overlap %>%
@@ -313,3 +313,25 @@ A few patterns are clear from these graphs:
 -   Calving season ranges shared a high overlap with the winter season range immediately preceding it, but there was considerable variation in this overlap.
 
 -   Winter and calving season ranges showed negligible overlap across years, suggesting low seasonal range fidelity.
+
+Lastly, let's look at the comparison of seasonal ranges between muskox 7012 and 7013, which were the only muskoxen that overlapped in space and time.
+
+```{r}
+#| label: musk_overlap_plot2
+#| dependson: "musk_overlap"
+#| echo: false
+
+musk_overlap %>%
+  filter(metric == "Percent Overlap",
+         Id_Number != Id_Number_compare,
+         season == season_compare,
+         year_min == year_min_compare) %>%
+  mutate(year_diff = year_min_compare - year_min) %>%
+  ggplot(aes(x = season, y = value)) +
+  geom_boxplot() +
+  ylim(0,1) +
+  ylab("Percent overlap of home ranges") +
+  xlab("Season")
+```
+
+The highest overlap is during the summer. These muskoxen do not appear to share large areas during the winter or calving season and despite being found in the same location occasionally, they appeared to wander on their own for most of the time they were collared.
