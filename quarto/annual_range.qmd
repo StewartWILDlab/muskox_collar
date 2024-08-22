@@ -1,0 +1,88 @@
+---
+title: "Annual Home Range"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(sf)
+library(here)
+library(adehabitatHR)
+library(tidyverse)
+```
+
+```{r}
+#| label: load-data
+#| echo: false
+
+musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
+```
+
+```{r}
+#| label: musk_annual
+#| dependson: "load-data"
+
+musk_annual <- musk_collar_filt  %>%
+  mutate(date = as.Date(datetime)) %>%
+  group_by(Id_Number, year) %>%
+  mutate(range_id = str_c(Id_Number,"_",year),
+         min_month = min(month),
+         max_month = max(month)) %>%
+  ungroup() %>%
+  filter(min_month <= 2,
+         max_month >= 11)%>%
+  sf::st_transform("+proj=utm +zone=9")
+
+```
+
+```{r}
+#| label: musk_mcp
+#| dependson: "musk_annual"
+
+musk_mcp <- mcp(musk_annual %>% select(range_id) %>% as_Spatial(),
+                percent = 95, unout = "km")
+
+```
+
+```{r, fig.height=6, fig.width=8}
+#| label: mcp_plots
+#| dependson: "musk_mcp"
+#| echo: false
+
+musk_mcp %>%
+  st_as_sf() %>%
+  rename(range_id = id) %>%
+  left_join(musk_annual %>% 
+              st_drop_geometry() %>%
+              select(range_id, year, Id_Number) %>% 
+              distinct()) %>%
+  ggplot(aes(fill = Id_Number)) +
+  geom_sf(alpha = 0.5) +
+  scale_fill_viridis_d()
+
+musk_mcp %>%
+  as_tibble() %>%
+  rename(range_id = id) %>%
+  left_join(musk_annual %>% 
+              st_drop_geometry() %>%
+              select(range_id, year, Id_Number) %>% 
+              distinct()) %>%
+  ggplot(aes(x = Id_Number, y = area, colour = factor(year))) +
+  geom_point(size = 3) +
+  scale_colour_viridis_d()
+
+musk_mcp %>%
+  as_tibble() %>%
+  summarise(mean = round(mean(area)),
+            min = round(min(area)),
+            max = round(max(area))) %>%
+  knitr::kable()
+```

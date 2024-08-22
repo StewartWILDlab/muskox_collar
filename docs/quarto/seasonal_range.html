@@ -211,85 +211,107 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </figure>
 </div>
 </div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_season_length <span class="sc">%&gt;%</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Id_Number, season, year_min) <span class="sc">%&gt;%</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">min =</span> <span class="fu">min</span>(<span class="fu">as.Date</span>(date)),</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">max =</span> <span class="fu">max</span>(<span class="fu">as.Date</span>(date))) <span class="sc">%&gt;%</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">y =</span> Id_Number, <span class="at">xmin =</span> min, <span class="at">xmax =</span> max, <span class="at">colour =</span> season)) <span class="sc">+</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_linerange</span>(<span class="at">linewidth =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_date</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="seasonal_range_files/figure-html/season_length-2.png" class="img-fluid figure-img" width="768"></p>
+</figure>
 </div>
-<p>Some seasons are pretty short, due to the season overlapping the start or end of the monitoring period for that individuals. Let’s start by setting a cut-off for each season to be included in this analysis. Since muskoxen are moving around a lot in the summer, we’ll specify that we want at least four months of data (120 days). Summer usually goes from mid-May to end of October, so this cut-off assumes we have locations for roughly 80% of the period. Muskoxen are moving around less during the winter and calving seasons, so we will use cutoff of three and one month(s) (90 and 30 days). Winter typically lasts from end of October to our cutoff of April 1st and calving goes until mid May. This ensures roughly 60% of the season is included for winter and calving. Later we’ll compare different lengths of data to see the effect on home range estimates.</p>
+</div>
+</div>
+<p>Some seasons are pretty short, due to the season overlapping the start or end of the monitoring period for that individuals. Let’s start by setting a cut-off for each season to be included in this analysis. Since muskoxen are moving around a lot in the summer, we’ll specify that we want relocations from the full season. There were two muskoxen that had their collars come off in August, so these were not considered when estimating summer home ranges. We captured full calving seasons in all but one instance (708 in 2008). Collars were typically deployed and removed during the winter, so there were several instances where we did not have relocations for the full winter season. For now we will use cutoff of three months (90 days). Winter typically lasts from end of October to our cutoff of April 1st. This ensures roughly 60% of the season is included for winter. Later we’ll compare different lengths of data to see the effect on home range estimates.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_collar_seas <span class="ot">&lt;-</span> musk_season_length <span class="sc">%&gt;%</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="do">### create groupings for muskoxen (7012 and 7013 overlap but the rest are separated)</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="fu">str_c</span>(Id_Number,<span class="st">"_"</span>,year_min,<span class="st">"_"</span>,season),</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">group =</span> <span class="fu">ifelse</span>(Id_Number <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">7012</span>,<span class="dv">7013</span>),</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"7012_13"</span>, <span class="fu">str_c</span>(Id_Number))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Calving"</span><span class="sc">&amp;</span>seas_length <span class="sc">&gt;=</span> <span class="dv">30</span><span class="sc">|</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>           season <span class="sc">==</span> <span class="st">"Winter"</span><span class="sc">&amp;</span>seas_length <span class="sc">&gt;=</span> <span class="dv">90</span><span class="sc">|</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>           season <span class="sc">==</span> <span class="st">"Summer"</span><span class="sc">&amp;</span>seas_length <span class="sc">&gt;=</span> <span class="dv">120</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="fu">factor</span>(range_id)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(range_id)</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_coordinates</span>()</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>musk_ltraj <span class="ot">&lt;-</span> adehabitatLT<span class="sc">::</span><span class="fu">as.ltraj</span>(<span class="at">xy =</span> xy, <span class="at">date =</span> musk_collar_seas<span class="sc">$</span>datetime, <span class="at">id =</span> musk_collar_seas<span class="sc">$</span>range_id)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>musk_collar_seas <span class="ot">&lt;-</span> musk_season_length <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="do">### create groupings for muskoxen (7012 and 7013 overlap but the rest are separated)</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="fu">str_c</span>(Id_Number,<span class="st">"_"</span>,year_min,<span class="st">"_"</span>,season),</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">group =</span> <span class="fu">ifelse</span>(Id_Number <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">7012</span>,<span class="dv">7013</span>),</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"7012_13"</span>, <span class="fu">str_c</span>(Id_Number))) <span class="sc">%&gt;%</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Id_Number) <span class="sc">%&gt;%</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">max_date =</span> <span class="fu">max</span>(date),</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">min_date =</span> <span class="fu">min</span>(date)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">flag =</span> <span class="fu">ifelse</span>(<span class="fu">max</span>(date)<span class="sc">==</span>max_date<span class="sc">|</span><span class="fu">min</span>(date)<span class="sc">==</span>min_date,<span class="dv">1</span>,<span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(flag <span class="sc">==</span> <span class="dv">0</span><span class="sc">|</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>           season <span class="sc">==</span> <span class="st">"Calving"</span><span class="sc">&amp;</span>seas_length <span class="sc">&gt;=</span> <span class="dv">28</span><span class="sc">|</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>           season <span class="sc">==</span> <span class="st">"Winter"</span><span class="sc">&amp;</span>seas_length <span class="sc">&gt;=</span><span class="dv">90</span><span class="sc">|</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>           season <span class="sc">==</span> <span class="st">"Summer"</span><span class="sc">&amp;</span>seas_length <span class="sc">&gt;=</span> <span class="dv">120</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="fu">factor</span>(range_id)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(range_id)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_coordinates</span>()</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>musk_ltraj <span class="ot">&lt;-</span> adehabitatLT<span class="sc">::</span><span class="fu">as.ltraj</span>(<span class="at">xy =</span> xy, <span class="at">date =</span> musk_collar_seas<span class="sc">$</span>datetime, <span class="at">id =</span> musk_collar_seas<span class="sc">$</span>range_id)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Our first step towards creating seasonal home ranges is to determine GPS accuracy using stationary GPS data. We can use data from collar 707 as this collar was confirmed to have released early. We will calculate the standard deviation of the euclidean distances to estimate GPS accuracy. This will be used as the sig2 parameter in our models and can be used to help estimate the other model parameter, sig1, which is related to home range size.</p>
 <p>We can then fit movement models for each muskox for each season and estimate utilization distributions. From these distributions we can compare size and overlap between seasons, years, and muskoxen.</p>
 <p>Below we plot an example seasonal range as well as a comparison between 90% seasonal ranges and 50% core seasonal ranges for each season.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>sig2 <span class="ot">&lt;-</span> musk_collar_cal <span class="sc">%&gt;%</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Id_Number <span class="sc">==</span> <span class="dv">707</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">1</span>],</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">2</span>]) <span class="sc">%&gt;%</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Id_Number) <span class="sc">%&gt;%</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="do">### calculate distances to estimate euclidean standard deviation (telemetry error)</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean_x =</span> <span class="fu">mean</span>(x),</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">mean_y =</span> <span class="fu">mean</span>(y),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">distance =</span> <span class="fu">sqrt</span>((x<span class="sc">-</span>mean_x)<span class="sc">^</span><span class="dv">2</span><span class="sc">+</span>(y<span class="sc">-</span>mean_y)<span class="sc">^</span><span class="dv">2</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">sd =</span> <span class="fu">sd</span>(distance)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(sd) <span class="sc">%&gt;%</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mean</span>()</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>sig1 <span class="ot">&lt;-</span> <span class="fu">liker</span>(musk_ltraj, </span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>              <span class="at">sig2 =</span> sig2, </span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>              <span class="at">rangesig1 =</span> <span class="fu">c</span>(<span class="fl">0.1</span>,<span class="dv">20</span>),</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>              <span class="at">plotit =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>sig2 <span class="ot">&lt;-</span> musk_collar_cal <span class="sc">%&gt;%</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Id_Number <span class="sc">==</span> <span class="dv">707</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">1</span>],</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">2</span>]) <span class="sc">%&gt;%</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Id_Number) <span class="sc">%&gt;%</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="do">### calculate distances to estimate euclidean standard deviation (telemetry error)</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean_x =</span> <span class="fu">mean</span>(x),</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">mean_y =</span> <span class="fu">mean</span>(y),</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">distance =</span> <span class="fu">sqrt</span>((x<span class="sc">-</span>mean_x)<span class="sc">^</span><span class="dv">2</span><span class="sc">+</span>(y<span class="sc">-</span>mean_y)<span class="sc">^</span><span class="dv">2</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">sd =</span> <span class="fu">sd</span>(distance)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(sd) <span class="sc">%&gt;%</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mean</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>bbox <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">1</span>],</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">2</span>]) <span class="sc">%&gt;%</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>()  <span class="sc">%&gt;%</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(group) <span class="sc">%&gt;%</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">xmin =</span> <span class="fu">min</span>(x),</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">xmax =</span> <span class="fu">max</span>(x),</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">ymin =</span> <span class="fu">min</span>(y),</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">ymax =</span> <span class="fu">max</span>(y))</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>sp_pixels <span class="ot">=</span> <span class="fu">list</span>()</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(bbox)){</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  coords <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">x =</span> <span class="fu">seq</span>(bbox<span class="sc">$</span>xmin[i]<span class="sc">-</span><span class="dv">5000</span>,bbox<span class="sc">$</span>xmax[i]<span class="sc">+</span><span class="dv">5000</span>,<span class="dv">100</span>),</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>                      <span class="at">y =</span> <span class="fu">seq</span>(bbox<span class="sc">$</span>ymin[i]<span class="sc">-</span><span class="dv">5000</span>,bbox<span class="sc">$</span>ymax[i]<span class="sc">+</span><span class="dv">5000</span>,<span class="dv">100</span>))</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  sf_points <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(coords, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">"x"</span>, <span class="st">"y"</span>), <span class="at">crs =</span> <span class="st">"+proj=utm +zone=9"</span>)</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  sp_points <span class="ot">&lt;-</span> <span class="fu">as</span>(sf_points, <span class="st">"Spatial"</span>)</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  sp_pixels[[bbox<span class="sc">$</span>group[i]]] <span class="ot">&lt;-</span> <span class="fu">SpatialPixels</span>(sp_points)</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>musk_bb <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>lookup <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(range_id, group) <span class="sc">%&gt;%</span></span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>()</span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="co"># for(i in 1:length(sig1)){</span></span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="co">#   musk_bb[[i]] &lt;- kernelbb(musk_ltraj[i],</span></span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="co">#                            sig1 = sig1[[i]]$sig1,</span></span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="co">#                            sig2 = sig2,</span></span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a><span class="co">#                            grid=sp_pixels[[lookup$group[i]]])</span></span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span>
-<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="co"># saveRDS(musk_bb, here("data/processed/musk_bb.rds"))</span></span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>musk_bb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/musk_bb.rds"</span>))  </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>sig1 <span class="ot">&lt;-</span> <span class="fu">liker</span>(musk_ltraj, </span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>              <span class="at">sig2 =</span> sig2, </span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>              <span class="at">rangesig1 =</span> <span class="fu">c</span>(<span class="fl">0.1</span>,<span class="dv">20</span>),</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>              <span class="at">plotit =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>bbox <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">1</span>],</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(geometry)[,<span class="dv">2</span>]) <span class="sc">%&gt;%</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>()  <span class="sc">%&gt;%</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(group) <span class="sc">%&gt;%</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">xmin =</span> <span class="fu">min</span>(x),</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">xmax =</span> <span class="fu">max</span>(x),</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">ymin =</span> <span class="fu">min</span>(y),</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">ymax =</span> <span class="fu">max</span>(y))</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>sp_pixels <span class="ot">=</span> <span class="fu">list</span>()</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(bbox)){</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  coords <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">x =</span> <span class="fu">seq</span>(bbox<span class="sc">$</span>xmin[i]<span class="sc">-</span><span class="dv">5000</span>,bbox<span class="sc">$</span>xmax[i]<span class="sc">+</span><span class="dv">5000</span>,<span class="dv">100</span>),</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>                      <span class="at">y =</span> <span class="fu">seq</span>(bbox<span class="sc">$</span>ymin[i]<span class="sc">-</span><span class="dv">5000</span>,bbox<span class="sc">$</span>ymax[i]<span class="sc">+</span><span class="dv">5000</span>,<span class="dv">100</span>))</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  sf_points <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(coords, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">"x"</span>, <span class="st">"y"</span>), <span class="at">crs =</span> <span class="st">"+proj=utm +zone=9"</span>)</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  sp_points <span class="ot">&lt;-</span> <span class="fu">as</span>(sf_points, <span class="st">"Spatial"</span>)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  sp_pixels[[bbox<span class="sc">$</span>group[i]]] <span class="ot">&lt;-</span> <span class="fu">SpatialPixels</span>(sp_points)</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>musk_bb <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>lookup <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(range_id, group) <span class="sc">%&gt;%</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>()</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="co"># for(i in 1:length(sig1)){</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="co">#   musk_bb[[i]] &lt;- kernelbb(musk_ltraj[i],</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="co">#                            sig1 = sig1[[i]]$sig1,</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="co">#                            sig2 = sig2,</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="co">#                            grid=sp_pixels[[lookup$group[i]]])</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="co"># saveRDS(musk_bb, here("data/processed/musk_bb.rds"))</span></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>musk_bb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/musk_bb.rds"</span>))  </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let’s take a look at the contour plots for each individual to make sure they look okay:</p>
 <div class="cell">
@@ -389,49 +411,80 @@ Using geom_raster() with maxpixels = 523905.</code></pre>
 </div>
 </div>
 <p>There are some large ranges in 2009, particularly for 7011 (summer and calving), 7010 winter, 7012 calving, and 708 winter.</p>
+<p>Interestingly, summer home range sizes are fairly consistent within individuals and between the two individuals (7012 and 7013) that overlap in space use. Perhaps the land cover or topography of the area plays a large role in determining home range size. This is not the case with winter or calving range, which show a lot of variability within individuals, but appear to be similar within years. This suggests a role of weather (e.g.&nbsp;snow depth) in determining winter and calving range size, though differences in topography and land cover could still account for the variation seen in some years (e.g.&nbsp;2009). Let’s compare these differences using mean absolute percentage differences for range sizes</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">season</th>
+<th style="text-align: right;">mean_percent_diff_id</th>
+<th style="text-align: right;">mean_percent_diff_year</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Summer</td>
+<td style="text-align: right;">0.07</td>
+<td style="text-align: right;">0.38</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Winter</td>
+<td style="text-align: right;">0.66</td>
+<td style="text-align: right;">0.32</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Calving</td>
+<td style="text-align: right;">0.49</td>
+<td style="text-align: right;">0.50</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <section id="range-overlap" class="level2">
 <h2 class="anchored" data-anchor-id="range-overlap">Range Overlap</h2>
 <p>We will now use the <code>kerneloverlap</code> function to investigate the degree of overlap between seasonal ranges within the same year and between years. This function implements a number of overlap metrics that are well suited to measuring overlap of utilization distributions. Consequently, we can explore not only overlap between contours of a given size, but also the degree to which high probability regions of ranges overlap. For example the <code>PHR</code> function calculates the probability of an individual from one home range being found in another home range.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>overlap_func <span class="ot">&lt;-</span> <span class="cf">function</span>(group){</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  rows <span class="ot">=</span> <span class="fu">which</span>(lookup<span class="sc">$</span>group <span class="sc">==</span> group)</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  temp <span class="ot">&lt;-</span> musk_bb[rows]</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">class</span>(temp) <span class="ot">&lt;-</span> <span class="st">"estUDm"</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  poverlap <span class="ot">&lt;-</span> <span class="fu">kerneloverlaphr</span>(temp, <span class="at">method =</span> <span class="st">"HR"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>(<span class="at">.name_repair =</span> <span class="st">"unique"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">setNames</span>(lookup<span class="sc">$</span>range_id[rows]) <span class="sc">%&gt;%</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> lookup<span class="sc">$</span>range_id[rows],</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>           <span class="at">metric =</span> <span class="st">"Percent Overlap"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(rows), </span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>                 <span class="at">names_to =</span> <span class="st">"range_id_compare"</span>, </span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>                 <span class="at">values_to =</span> <span class="st">"value"</span>)</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  volume <span class="ot">&lt;-</span> <span class="fu">kerneloverlaphr</span>(temp, <span class="at">method =</span> <span class="st">"PHR"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>(<span class="at">.name_repair =</span> <span class="st">"unique"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">setNames</span>(lookup<span class="sc">$</span>range_id[rows]) <span class="sc">%&gt;%</span></span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> lookup<span class="sc">$</span>range_id[rows],</span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>           <span class="at">metric =</span> <span class="st">"Volume of UD"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(rows), </span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>                 <span class="at">names_to =</span> <span class="st">"range_id_compare"</span>, </span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>                 <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">value =</span> <span class="fu">round</span>(value,<span class="dv">3</span>))</span>
-<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>  overlap <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(poverlap,volume)  </span>
-<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>musk_overlap <span class="ot">&lt;-</span> <span class="fu">map</span>(<span class="fu">unique</span>(lookup<span class="sc">$</span>group), <span class="cf">function</span>(.x){<span class="fu">overlap_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
-<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(range_id <span class="sc">!=</span> range_id_compare) <span class="sc">%&gt;%</span></span>
-<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_collar_seas <span class="sc">%&gt;%</span> </span>
-<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(range_id, Id_Number, year_min, season) <span class="sc">%&gt;%</span></span>
-<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>              <span class="fu">distinct</span>(),</span>
-<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>            <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"range_id_compare"</span> <span class="ot">=</span> <span class="st">"range_id"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">Id_Number_compare =</span> Id_Number,</span>
-<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_min_compare =</span> year_min,</span>
-<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a>         <span class="at">season_compare =</span> season) <span class="sc">%&gt;%</span></span>
-<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_collar_seas <span class="sc">%&gt;%</span> </span>
-<span id="cb12-37"><a href="#cb12-37" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(range_id, Id_Number, year_min, season) <span class="sc">%&gt;%</span></span>
-<span id="cb12-39"><a href="#cb12-39" aria-hidden="true" tabindex="-1"></a>              <span class="fu">distinct</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>overlap_func <span class="ot">&lt;-</span> <span class="cf">function</span>(group){</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  rows <span class="ot">=</span> <span class="fu">which</span>(lookup<span class="sc">$</span>group <span class="sc">==</span> group)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  temp <span class="ot">&lt;-</span> musk_bb[rows]</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">class</span>(temp) <span class="ot">&lt;-</span> <span class="st">"estUDm"</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  poverlap <span class="ot">&lt;-</span> <span class="fu">kerneloverlaphr</span>(temp, <span class="at">method =</span> <span class="st">"HR"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>(<span class="at">.name_repair =</span> <span class="st">"unique"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">setNames</span>(lookup<span class="sc">$</span>range_id[rows]) <span class="sc">%&gt;%</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> lookup<span class="sc">$</span>range_id[rows],</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>           <span class="at">metric =</span> <span class="st">"Percent Overlap"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(rows), </span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>                 <span class="at">names_to =</span> <span class="st">"range_id_compare"</span>, </span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>                 <span class="at">values_to =</span> <span class="st">"value"</span>)</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  volume <span class="ot">&lt;-</span> <span class="fu">kerneloverlaphr</span>(temp, <span class="at">method =</span> <span class="st">"PHR"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>(<span class="at">.name_repair =</span> <span class="st">"unique"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">setNames</span>(lookup<span class="sc">$</span>range_id[rows]) <span class="sc">%&gt;%</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> lookup<span class="sc">$</span>range_id[rows],</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>           <span class="at">metric =</span> <span class="st">"Volume of UD"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(rows), </span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>                 <span class="at">names_to =</span> <span class="st">"range_id_compare"</span>, </span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>                 <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">value =</span> <span class="fu">round</span>(value,<span class="dv">3</span>))</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>  overlap <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(poverlap,volume)  </span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>musk_overlap <span class="ot">&lt;-</span> <span class="fu">map</span>(<span class="fu">unique</span>(lookup<span class="sc">$</span>group), <span class="cf">function</span>(.x){<span class="fu">overlap_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(range_id <span class="sc">!=</span> range_id_compare) <span class="sc">%&gt;%</span></span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_collar_seas <span class="sc">%&gt;%</span> </span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(range_id, Id_Number, year_min, season) <span class="sc">%&gt;%</span></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>              <span class="fu">distinct</span>(),</span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>            <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"range_id_compare"</span> <span class="ot">=</span> <span class="st">"range_id"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">Id_Number_compare =</span> Id_Number,</span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_min_compare =</span> year_min,</span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a>         <span class="at">season_compare =</span> season) <span class="sc">%&gt;%</span></span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_collar_seas <span class="sc">%&gt;%</span> </span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(range_id, Id_Number, year_min, season) <span class="sc">%&gt;%</span></span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a>              <span class="fu">distinct</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let’s plot the overlap metrics. The first graph shows the percent overlap of an individual’s 95% home range contour from different seasons and years. Home rqanges represented by columns are compared against home ranges represented by rows and separated by different year lags.</p>
 <p>The second graph depicts the probability that an individual with a utilization distribution represented by the row is found in the 95% home range contour represented by the column.</p>
@@ -469,6 +522,43 @@ Using geom_raster() with maxpixels = 523905.</code></pre>
 </div>
 </div>
 <p>The highest overlap is during the summer. These muskoxen do not appear to share large areas during the winter or calving season and despite being found in the same location occasionally, they appeared to wander on their own for most of the time they were collared.</p>
+</section>
+<section id="check-data-cutoffs" class="level2">
+<h2 class="anchored" data-anchor-id="check-data-cutoffs">Check Data Cutoffs</h2>
+<p>Let’s first check to see if our data cutoffs are appropriate. We’ll subset our datasets for winter to look at the individual-season combinations with relocations covering the full season. We’ll then calculate home ranges for the full dataset and data set with 30,60,90 days removed from the start or end of the time series. We’ll then look at percent overlap between the home ranges. We’ll consider the subset to be a good approximation of the seasonal home range if the percent overlap is &gt;80%.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>temp <span class="ot">&lt;-</span> musk_season_length <span class="sc">%&gt;%</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="fu">str_c</span>(Id_Number,<span class="st">"_"</span>,year_min,<span class="st">"_"</span>,season)) <span class="sc">%&gt;%</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id, season) <span class="sc">%&gt;%</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">min =</span> <span class="fu">min</span>(date),</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">max =</span> <span class="fu">max</span>(date),</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>            <span class="at">seas_length =</span> <span class="fu">median</span>(seas_length))</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>top_seas <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(range_id, season, month) <span class="sc">%&gt;%</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>,</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>         <span class="fu">n</span>()<span class="sc">&gt;=</span><span class="dv">5</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id)</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>cut_check <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(range_id <span class="sc">%in%</span> top_seas)</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>cut_check_30beg <span class="ot">&lt;-</span> cut_check <span class="sc">%&gt;%</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(datetime) <span class="sc">%&gt;%</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(date <span class="sc">&lt;</span> (<span class="fu">max</span>(date)<span class="sc">-</span><span class="dv">30</span>))</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> musk_collar_seas <span class="sc">%&gt;%</span></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_coordinates</span>()</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>musk_ltraj <span class="ot">&lt;-</span> adehabitatLT<span class="sc">::</span><span class="fu">as.ltraj</span>(<span class="at">xy =</span> xy, <span class="at">date =</span> musk_collar_seas<span class="sc">$</span>datetime, <span class="at">id =</span> musk_collar_seas<span class="sc">$</span>range_id)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="determinants-of-home-range-size" class="level2">
+<h2 class="anchored" data-anchor-id="determinants-of-home-range-size">Determinants of Home Range Size</h2>
+<p>Now we will look to model variables that are likely to influence the size of home ranges. Since we have few observations per season (sample size 12 - 15), we want 1 - 2 explantory variables per season model. Average snow cover during the winter and calving seasons may impact home range size, with individuals being restricted from moving large distances. During the summer, the percent of landcover suitable for foraging or number of foraging patches may impact the size of home ranges with larger home ranges occurring when individuals need to travel more often or further to get to foraging areas. Other barriers to movement may also affect home range size, including ridges and lakes.</p>
 
 
 </section>

@@ -13,4 +13,5 @@ website:
       - quarto/data_exploration.qmd
       - quarto/movement_patterns.qmd
       - quarto/home_range.qmd
+      - quarto/annual_range.qmd
       - quarto/seasonal_range.qmd

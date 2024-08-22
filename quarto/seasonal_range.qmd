@@ -33,6 +33,7 @@ Using Brownian Bridge Movement Model from the adehabitatHR package to estimate s
 
 ```{r, fig.height=6, fig.width=8}
 #| label: season_length
+#| dependson: "load-data"
 
 musk_season_length <- musk_season %>%
   mutate(date = as.Date(datetime),
@@ -54,21 +55,37 @@ musk_season_length %>%
                     y = c(120,90,30)),
     aes(yintercept = y)) +
   facet_wrap(~season)
+
+musk_season_length %>%
+  st_drop_geometry() %>%
+  group_by(Id_Number, season, year_min) %>%
+  summarise(min = min(as.Date(date)),
+            max = max(as.Date(date))) %>%
+  ggplot(aes(y = Id_Number, xmin = min, xmax = max, colour = season)) +
+  geom_linerange(linewidth = 2) +
+  scale_x_date()
 ```
 
-Some seasons are pretty short, due to the season overlapping the start or end of the monitoring period for that individuals. Let's start by setting a cut-off for each season to be included in this analysis. Since muskoxen are moving around a lot in the summer, we'll specify that we want at least four months of data (120 days). Summer usually goes from mid-May to end of October, so this cut-off assumes we have locations for roughly 80% of the period. Muskoxen are moving around less during the winter and calving seasons, so we will use cutoff of three and one month(s) (90 and 30 days). Winter typically lasts from end of October to our cutoff of April 1st and calving goes until mid May. This ensures roughly 60% of the season is included for winter and calving. Later we'll compare different lengths of data to see the effect on home range estimates.
+Some seasons are pretty short, due to the season overlapping the start or end of the monitoring period for that individuals. Let's start by setting a cut-off for each season to be included in this analysis. Since muskoxen are moving around a lot in the summer, we'll specify that we want relocations from the full season. There were two muskoxen that had their collars come off in August, so these were not considered when estimating summer home ranges. We captured full calving seasons in all but one instance (708 in 2008). Collars were typically deployed and removed during the winter, so there were several instances where we did not have relocations for the full winter season. For now we will use cutoff of three months (90 days). Winter typically lasts from end of October to our cutoff of April 1st. This ensures roughly 60% of the season is included for winter. Later we'll compare different lengths of data to see the effect on home range estimates.
 
 ```{r}
 #| label: musk_ltraj
+#| dependson: "season_length"
 
 musk_collar_seas <- musk_season_length %>%
   ### create groupings for muskoxen (7012 and 7013 overlap but the rest are separated)
   mutate(range_id = str_c(Id_Number,"_",year_min,"_",season),
          group = ifelse(Id_Number %in% c(7012,7013),
                         "7012_13", str_c(Id_Number))) %>%
+  group_by(Id_Number) %>%
+  mutate(max_date = max(date),
+         min_date = min(date)) %>%
   group_by(range_id) %>%
-  filter(season == "Calving"&seas_length >= 30|
-           season == "Winter"&seas_length >= 90|
+  mutate(flag = ifelse(max(date)==max_date|min(date)==min_date,1,0)) %>%
+  ungroup() %>%
+  filter(flag == 0|
+           season == "Calving"&seas_length >= 28|
+           season == "Winter"&seas_length >=90|
            season == "Summer"&seas_length >= 120) %>%
   ungroup() %>%
   mutate(range_id = factor(range_id)) %>%
@@ -88,7 +105,7 @@ We can then fit movement models for each muskox for each season and estimate uti
 Below we plot an example seasonal range as well as a comparison between 90% seasonal ranges and 50% core seasonal ranges for each season.
 
 ```{r}
-#| label: sig1
+#| label: sig2
 
 sig2 <- musk_collar_cal %>%
   sf::st_transform("+proj=utm +zone=9") %>%
@@ -105,16 +122,23 @@ sig2 <- musk_collar_cal %>%
   pull(sd) %>%
   mean()
 
+
+```
+
+```{r}
+#| label: sig1
+#| dependson: "sig2"
+
 sig1 <- liker(musk_ltraj, 
               sig2 = sig2, 
               rangesig1 = c(0.1,20),
               plotit = FALSE)
 
-
 ```
 
 ```{r}
 #| label: musk_bb
+#| dependson: "sig1"
 
 bbox <- musk_collar_seas %>%
   sf::st_transform("+proj=utm +zone=9") %>%
@@ -206,7 +230,7 @@ These look reasonable. Let's also plot the seasonal range sizes to compare betwe
 
 musk_seasrange <- map(musk_bb, function(x){kernel.area(x,percent = c(50,95),unout = "km2") %>% as_tibble_row()}) %>%
   list_rbind() %>%
-  set_names(c("range_50", "range_90")) %>%
+  set_names(c("range_50", "range_95")) %>%
   mutate(range_id = unique(musk_collar_seas$range_id)) %>%
   left_join(musk_collar_seas %>% 
               sf::st_drop_geometry() %>%
@@ -214,7 +238,7 @@ musk_seasrange <- map(musk_bb, function(x){kernel.area(x,percent = c(50,95),unou
               distinct())
 
 musk_seasrange %>%
-  ggplot(aes(x = Id_Number, y = range_90, colour = factor(year_min))) +
+  ggplot(aes(x = Id_Number, y = range_95, colour = factor(year_min))) +
   geom_point(size = 3) +
   facet_wrap(~season, scales = "free")
 musk_seasrange %>%
@@ -224,6 +248,27 @@ musk_seasrange %>%
 ```
 
 There are some large ranges in 2009, particularly for 7011 (summer and calving), 7010 winter, 7012 calving, and 708 winter.
+
+Interestingly, summer home range sizes are fairly consistent within individuals and between the two individuals (7012 and 7013) that overlap in space use. Perhaps the land cover or topography of the area plays a large role in determining home range size. This is not the case with winter or calving range, which show a lot of variability within individuals, but appear to be similar within years. This suggests a role of weather (e.g. snow depth) in determining winter and calving range size, though differences in topography and land cover could still account for the variation seen in some years (e.g. 2009). Let's compare these differences using mean absolute percentage differences for range sizes
+
+```{r, fig.height=6, fig.width=10}
+#| label: musk_seasvar
+#| dependson: "musk_seasrange"
+#| echo: false
+
+musk_seasrange %>%
+  group_by(Id_Number, season) %>%
+  mutate(mean_id = mean(range_95),
+         pdiff_id = abs(mean_id - range_95)/mean_id) %>%
+  group_by(year_min, season) %>%
+  mutate(mean_year = mean(range_95),
+         pdiff_year = abs(mean_year - range_95)/mean_year) %>%
+  group_by(season) %>%
+  summarise(mean_percent_diff_id = round(sum(pdiff_id)/sum(pdiff_id>0),2),
+            mean_percent_diff_year = round(sum(pdiff_year)/sum(pdiff_year>0),2)) %>%
+  knitr::kable()
+
+```
 
 ## Range Overlap
 
@@ -336,6 +381,42 @@ musk_overlap %>%
 ```
 
 The highest overlap is during the summer. These muskoxen do not appear to share large areas during the winter or calving season and despite being found in the same location occasionally, they appeared to wander on their own for most of the time they were collared.
+
+## Check Data Cutoffs
+
+Let's first check to see if our data cutoffs are appropriate. We'll subset our datasets for winter to look at the individual-season combinations with relocations covering the full season. We'll then calculate home ranges for the full dataset and data set with 30,60,90 days removed from the start or end of the time series. We'll then look at percent overlap between the home ranges. We'll consider the subset to be a good approximation of the seasonal home range if the percent overlap is \>80%.
+
+```{r}
+#| label: cut_check
+
+temp <- musk_season_length %>%
+  mutate(range_id = str_c(Id_Number,"_",year_min,"_",season)) %>%
+  st_drop_geometry() %>%
+  group_by(range_id, season) %>%
+  summarise(min = min(date),
+            max = max(date),
+            seas_length = median(seas_length))
+
+top_seas <- musk_collar_seas %>%
+  distinct(range_id, season, month) %>%
+  group_by(range_id) %>%
+  filter(season == "Winter",
+         n()>=5) %>%
+  pull(range_id)
+  
+cut_check <- musk_collar_seas %>%
+  filter(range_id %in% top_seas)
+cut_check_30beg <- cut_check %>%
+  group_by(range_id) %>%
+  arrange(datetime) %>%
+  filter(date < (max(date)-30))
+  
+
+xy <- musk_collar_seas %>%
+  sf::st_transform("+proj=utm +zone=9") %>%
+  sf::st_coordinates()
+musk_ltraj <- adehabitatLT::as.ltraj(xy = xy, date = musk_collar_seas$datetime, id = musk_collar_seas$range_id)
+```
 
 ## Determinants of Home Range Size
 
