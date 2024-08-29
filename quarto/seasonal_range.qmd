@@ -45,16 +45,6 @@ musk_season_length <- musk_season %>%
   mutate(seas_length = max(date)-min(date)) %>%
   ungroup() 
 
-musk_season_length %>%
-  sf::st_drop_geometry() %>%
-  distinct(Id_Number, year_min, season, seas_length) %>%
-  ggplot(aes(x = Id_Number, y = seas_length, colour = factor(year_min))) +
-  geom_point(size = 3) +
-  geom_hline(
-    data = tibble(season = factor(c("Summer", "Winter", "Calving")),
-                    y = c(120,90,30)),
-    aes(yintercept = y)) +
-  facet_wrap(~season)
 
 musk_season_length %>%
   st_drop_geometry() %>%
@@ -86,7 +76,10 @@ musk_collar_seas <- musk_season_length %>%
   filter(flag == 0|
            season == "Calving"&seas_length >= 28|
            season == "Winter"&seas_length >=90|
-           season == "Summer"&seas_length >= 120) %>%
+           season == "Summer"&seas_length >= 120,
+         ### remove this calving season as the collar seems to have fallen off 
+         ### part way through the season
+         range_id != "706_2009_Calving") %>%
   ungroup() %>%
   mutate(range_id = factor(range_id)) %>%
   arrange(range_id)
@@ -172,8 +165,7 @@ lookup <- musk_collar_seas %>%
 #                            grid=sp_pixels[[lookup$group[i]]])
 # }
 # saveRDS(musk_bb, here("data/processed/musk_bb.rds"))
-musk_bb <- readRDS(here("data/processed/musk_bb.rds"))  
-
+musk_bb <- readRDS(here("data/processed/musk_bb.rds"))
 
 ```
 
@@ -184,19 +176,34 @@ Let's take a look at the contour plots for each individual to make sure they loo
 #| dependson: "musk_bb"
 #| echo: false
 
-musk_seascont <- map(musk_bb, function(x){getverticeshr(x,95) %>% st_as_sf()}) %>%
+musk_seascont_95 <- map(musk_bb, function(x){getverticeshr(x,95) %>% st_as_sf()}) %>%
   list_rbind() %>%
   st_as_sf() %>%
   mutate(range_id = unique(musk_collar_seas$range_id)) %>%
   left_join(musk_collar_seas %>% 
               sf::st_drop_geometry() %>%
-              dplyr::select(range_id,Id_Number,year_min,season) %>% 
+              dplyr::select(range_id,Id_Number,year_min,season, seas_length) %>% 
               distinct()) %>%
-  mutate(season = factor(season, levels = c("Summer","Winter","Calving")))
+  mutate(season = factor(season, levels = c("Summer","Winter","Calving")),
+         range = "home")
+musk_seascont_50 <- map(musk_bb, function(x){getverticeshr(x,50) %>% st_as_sf()}) %>%
+  list_rbind() %>%
+  st_as_sf() %>%
+  mutate(range_id = unique(musk_collar_seas$range_id)) %>%
+  left_join(musk_collar_seas %>% 
+              sf::st_drop_geometry() %>%
+              dplyr::select(range_id,Id_Number,year_min,season, seas_length) %>% 
+              distinct()) %>%
+  mutate(season = factor(season, levels = c("Summer","Winter","Calving")),
+         range = "core")
+musk_seascont <- bind_rows(musk_seascont_95, musk_seascont_50)
+
+saveRDS(musk_seascont, here("output/musk_seascont.rds"))
+
 basemaps::set_defaults(map_service = "osm", map_type = "topographic")
 for(i in unique(musk_collar_seas$Id_Number)){
   data <- musk_seascont %>%
-    filter(Id_Number == i) %>%
+    filter(Id_Number == i, range == "home") %>%
     st_set_crs("+proj=utm +zone=9") %>%
     st_transform(3857) %>%
     arrange(season)
@@ -278,7 +285,6 @@ We will now use the `kerneloverlap` function to investigate the degree of overla
 #| label: musk_overlap
 #| dependson: "musk_bb"
 
-
 overlap_func <- function(group){
   rows = which(lookup$group == group)
   temp <- musk_bb[rows]
@@ -291,7 +297,7 @@ overlap_func <- function(group){
     pivot_longer(1:length(rows), 
                  names_to = "range_id_compare", 
                  values_to = "value")
-  volume <- kerneloverlaphr(temp, method = "PHR") %>%
+  volume <- kerneloverlaphr(temp, method = "VI") %>%
     as_tibble(.name_repair = "unique") %>%
     setNames(lookup$range_id[rows]) %>%
     mutate(range_id = lookup$range_id[rows],
@@ -346,7 +352,7 @@ musk_overlap %>%
   ggplot(aes(x = factor(year_diff), y = value)) +
   geom_boxplot() +
   facet_grid(season~season_compare) +
-  ylab("Probability of finding individual in home range") +
+  ylab("Volume index") +
   xlab("Year lag")
 ```
 
@@ -382,42 +388,66 @@ musk_overlap %>%
 
 The highest overlap is during the summer. These muskoxen do not appear to share large areas during the winter or calving season and despite being found in the same location occasionally, they appeared to wander on their own for most of the time they were collared.
 
-## Check Data Cutoffs
+## Jan-Mar Winter Home Range
 
-Let's first check to see if our data cutoffs are appropriate. We'll subset our datasets for winter to look at the individual-season combinations with relocations covering the full season. We'll then calculate home ranges for the full dataset and data set with 30,60,90 days removed from the start or end of the time series. We'll then look at percent overlap between the home ranges. We'll consider the subset to be a good approximation of the seasonal home range if the percent overlap is \>80%.
+To limit the effect of winter season length on the effect of winter home range size, let's create winter home range estimates during the months of winter with the deepest snow (January - March). These estimates can be used later when modelling the effect of snow depth on winter home range size.
 
 ```{r}
-#| label: cut_check
+#| label: deepwint_range
+#| dependson: "musk_bb"
 
-temp <- musk_season_length %>%
-  mutate(range_id = str_c(Id_Number,"_",year_min,"_",season)) %>%
-  st_drop_geometry() %>%
-  group_by(range_id, season) %>%
-  summarise(min = min(date),
-            max = max(date),
-            seas_length = median(seas_length))
 
-top_seas <- musk_collar_seas %>%
-  distinct(range_id, season, month) %>%
-  group_by(range_id) %>%
+musk_collar_wint <- musk_collar_seas %>%
   filter(season == "Winter",
-         n()>=5) %>%
-  pull(range_id)
-  
-cut_check <- musk_collar_seas %>%
-  filter(range_id %in% top_seas)
-cut_check_30beg <- cut_check %>%
-  group_by(range_id) %>%
-  arrange(datetime) %>%
-  filter(date < (max(date)-30))
-  
+         month>=12|month<=3)
 
-xy <- musk_collar_seas %>%
+xy <- musk_collar_wint %>%
   sf::st_transform("+proj=utm +zone=9") %>%
   sf::st_coordinates()
-musk_ltraj <- adehabitatLT::as.ltraj(xy = xy, date = musk_collar_seas$datetime, id = musk_collar_seas$range_id)
+muskwint_ltraj <- adehabitatLT::as.ltraj(xy = xy, date = musk_collar_wint$datetime, id = as.character(musk_collar_wint$range_id))
+
+sig1_wint <- liker(muskwint_ltraj, 
+              sig2 = sig2, 
+              rangesig1 = c(0.1,20),
+              plotit = FALSE)
+
+musk_bb_wint <- list()
+lookup_wint <- musk_collar_wint %>%
+  st_drop_geometry() %>%
+  dplyr::select(range_id, group) %>%
+  distinct()
+for(i in 1:length(sig1_wint)){
+  musk_bb_wint[[i]] <- kernelbb(muskwint_ltraj[i],
+                           sig1 = sig1_wint[[i]]$sig1,
+                           sig2 = sig2,
+                           grid=sp_pixels[[lookup_wint$group[i]]])
+}
+saveRDS(musk_bb_wint, here("data/processed/musk_bb_wint.rds"))
+musk_bb_wint <- readRDS(here("data/processed/musk_bb_wint.rds"))
+
+musk_seascontwint_95 <- map(musk_bb_wint, function(x){getverticeshr(x,95) %>% st_as_sf()}) %>%
+  list_rbind() %>%
+  st_as_sf() %>%
+  mutate(range_id = unique(musk_collar_wint$range_id)) %>%
+  left_join(musk_collar_wint %>% 
+              sf::st_drop_geometry() %>%
+              dplyr::select(range_id,Id_Number,year_min,season, seas_length) %>% 
+              distinct()) %>%
+  mutate(season = factor(season, levels = c("Summer","Winter","Calving")),
+         range = "home")
+musk_seascontwint_50 <- map(musk_bb_wint, function(x){getverticeshr(x,50) %>% st_as_sf()}) %>%
+  list_rbind() %>%
+  st_as_sf() %>%
+  mutate(range_id = unique(musk_collar_wint$range_id)) %>%
+  left_join(musk_collar_wint %>% 
+              sf::st_drop_geometry() %>%
+              dplyr::select(range_id,Id_Number,year_min,season, seas_length) %>% 
+              distinct()) %>%
+  mutate(season = factor(season, levels = c("Summer","Winter","Calving")),
+         range = "core")
+musk_seascontwint <- bind_rows(musk_seascontwint_95, musk_seascontwint_50)
+
+saveRDS(musk_seascontwint, here("output/musk_seascontwint.rds"))
 ```
 
-## Determinants of Home Range Size
-
-Now we will look to model variables that are likely to influence the size of home ranges. Since we have few observations per season (sample size 12 - 15), we want 1 - 2 explantory variables per season model. Average snow cover during the winter and calving seasons may impact home range size, with individuals being restricted from moving large distances. During the summer, the percent of landcover suitable for foraging or number of foraging patches may impact the size of home ranges with larger home ranges occurring when individuals need to travel more often or further to get to foraging areas. Other barriers to movement may also affect home range size, including ridges and lakes.
+## 

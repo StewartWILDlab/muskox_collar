@@ -271,28 +271,28 @@ plot_wintrange <- function(id, min_year){
                                ifelse(month==4|month==5, "Apr-May", "Winter")),
            month_flag = factor(month_flag, levels = c("Sep-Oct", "Apr-May", "Winter")))
 
-lc_2010_crop <- terra::rast(here("data/processed/lc_2010_proj.tif")) %>%
-    terra::crop(musk_mig)
+  lc_2010_crop <- terra::rast(here("data/processed/lc_2010_proj.tif")) %>%
+      terra::crop(musk_mig)
+    
+  lc_atts <- readRDS(here("data/processed/lc_atts.rds"))
+  cols <- as.character(lc_atts$hex)
+  names(cols) <- as.character(lc_atts$Classification)
   
-lc_atts <- readRDS(here("data/processed/lc_atts.rds"))
-cols <- as.character(lc_atts$hex)
-names(cols) <- as.character(lc_atts$Classification)
-
-lines <- musk_mig %>%
-  group_by(Id_Number) %>%
-  arrange(datetime) %>%
-  summarise(do_union = FALSE) %>%
-  st_cast("LINESTRING")
-
-musk_mig  %>%
-  arrange(rev(snow_depth)) %>%
-  ggplot() +
-  tidyterra::geom_spatraster(data = lc_2010_crop) +
-  geom_sf(data = lines, linewidth = 1) +
-  geom_sf(aes(colour = snow_depth, shape = month_flag), size = 4) +
-  labs(title = str_c(id, " ", year)) +
-  scale_fill_manual(values = cols) +
-  scale_colour_gradient(low = "white", high = "red4")
+  lines <- musk_mig %>%
+    group_by(Id_Number) %>%
+    arrange(datetime) %>%
+    summarise(do_union = FALSE) %>%
+    st_cast("LINESTRING")
+  
+  musk_mig  %>%
+    arrange(rev(snow_depth)) %>%
+    ggplot() +
+    tidyterra::geom_spatraster(data = lc_2010_crop) +
+    geom_sf(data = lines, linewidth = 1) +
+    geom_sf(aes(colour = snow_depth, shape = month_flag), size = 4) +
+    labs(title = str_c(id, " ", year)) +
+    scale_fill_manual(values = cols) +
+    scale_colour_gradient(low = "white", high = "red4")
 }
 
 years <- snowdepth_locs %>%
@@ -395,11 +395,15 @@ musk_wint <- musk_migstart %>%
 
 pal <- colorFactor(
   palette = c('red', 'blue', 'green', 'yellow'),
-  domain = musk_wint$season
+  domain = c(musk_wint$season,"Summer")
 )
 
+wms_lc <- "https://datacube.services.geo.ca/ows/landcover"
 
 musk_wint %>%
+  bind_rows(snowdepth_locs %>%
+  filter(month < 9&month > 5) %>%
+    mutate(season = "Summer")) %>%
   leaflet() %>%
   addPolylines(data = lines,
                group = ~Id_Number) %>%
@@ -407,16 +411,19 @@ musk_wint %>%
              label = ~ Id_Number,
              popup = ~paste(datetime),
              group = ~Id_Number) %>%
-  addTiles() %>%
   addLayersControl(
     overlayGroups = ~unique(Id_Number),
     options = layersControlOptions(collapsed = FALSE)
   ) %>%
-  addLegend(pal=pal, values = ~season)
+  addMeasure(primaryLengthUnit = "meters") %>%
+  addLegend(pal=pal, values = ~season) %>%
   ### remember to specify the WMS version or it won't load
   # addWMSTiles(wms_dtm, layers = "dsm",
   #              options = WMSTileOptions(format = "image/png",
   #                                       transparent = TRUE, version = "1.3.0"))
+  addWMSTiles(wms_lc, layers = "landcover-2010",
+               options = WMSTileOptions(format = "image/png",
+                                        transparent = TRUE, version = "1.3.0"))
 
 
 ```

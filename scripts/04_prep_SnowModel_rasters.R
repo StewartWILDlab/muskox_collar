@@ -40,6 +40,8 @@ sm_2009_crop <- terra::crop(sm_2009, buffer)
 sm_2010_crop <- terra::crop(sm_2010, buffer)
 sm_2011_crop <- terra::crop(sm_2011, buffer)
 sm_2012_crop <- terra::crop(sm_2012, buffer)
+sm_crop <- c(sm_2007_crop, sm_2008_crop, sm_2009_crop, sm_2010_crop,
+             sm_2011_crop, sm_2012_crop)
 
 writeCDF(sm_2007_crop, "data/processed/sm_2007_crop.nc", overwrite = TRUE)
 writeCDF(sm_2008_crop, "data/processed/sm_2008_crop.nc", overwrite = TRUE)
@@ -47,6 +49,7 @@ writeCDF(sm_2009_crop, "data/processed/sm_2009_crop.nc", overwrite = TRUE)
 writeCDF(sm_2010_crop, "data/processed/sm_2010_crop.nc", overwrite = TRUE)
 writeCDF(sm_2011_crop, "data/processed/sm_2011_crop.nc", overwrite = TRUE)
 writeCDF(sm_2012_crop, "data/processed/sm_2012_crop.nc", overwrite = TRUE)
+writeCDF(sm_crop, "data/processed/sm_crop.nc", overwrite = TRUE)
 
 sm_2007_crop <- terra::rast("data/processed/sm_2007_crop.nc", 
                        drivers="NETCDF")
@@ -64,7 +67,7 @@ sm_2012_crop <- terra::rast("data/processed/sm_2012_crop.nc",
 
 ### Rasterize the muskox collar points to create zones for zonal statistics
 zones <- rasterize(musk_collar %>%
-                    sf::st_transform(terra::crs(sm_2008)),
+                    sf::st_transform(terra::crs(sm_2007_crop)),
                   sm_2007_crop, fun = "first")
 
 snowdepth_mean <- zonal(sm_2007_crop, zones, "mean", wide = FALSE) %>%

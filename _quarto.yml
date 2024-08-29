@@ -15,3 +15,4 @@ website:
       - quarto/home_range.qmd
       - quarto/annual_range.qmd
       - quarto/seasonal_range.qmd
+      - quarto/seasonal_range_mod.qmd

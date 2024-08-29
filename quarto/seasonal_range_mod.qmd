@@ -1,0 +1,584 @@
+---
+title: "Home Range Modelling"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(sf)
+library(here)
+library(terra)
+library(tidyverse)
+```
+
+```{r}
+#| label: load-data
+#| echo: false
+
+musk_collar_filt <- readRDS(here("data/processed/musk_collar_filt.rds"))
+musk_seascont <- readRDS(here("output/musk_seascont.rds"))
+musk_seascontwint <- readRDS(here("output/musk_seascontwint.rds"))
+```
+
+Now we will look to model variables that are likely to influence the size of home ranges. Since we have few observations per season (sample size 12 - 15), we want 1 - 2 explantory variables per season model. Average snow cover during the winter and calving seasons may impact home range size, with individuals being restricted from moving large distances. During the summer, the percent of landcover suitable for foraging or number of foraging patches may impact the size of home ranges with larger home ranges occurring when individuals need to travel more often or further to get to foraging areas. Other barriers to movement may also affect home range size, including ridges and lakes.
+
+# Home Range Size Models
+
+First we will examine differences in the home range over time for each muskoxen.
+
+Let's start by calculating average snow depth within each winter and calving home range. To be consistent across years and individuals, we will estimate mean snow depth across the same period ranging from the start November to the end of March for winter and March for calving. These periods roughly correspond to the shortest seasons across the data and include the most extreme snow depths.
+
+## Winter Season Model
+
+We'll start by estimating average snow depth for winter and running model with muskox ID as a random effect. For this model, we will use the winter home range estimates that were limited to the months January-March to control for season length and to focus on the periods of highest snow depth.
+
+```{r}
+#| label: musk_wint
+#| dependson: "load-data"
+
+sm_crop <- terra::rast(here("data/processed/sm_crop.nc"), 
+                       drivers="NETCDF")
+daterange <- seq( as.Date("2007-01-01"), as.Date("2012-12-31"), by="+1 day")
+
+snow_wint_func <- function(id, range){
+  year <- musk_seascontwint %>%
+    filter(range_id == !!id, range == !!range) %>%
+    pull(year_min)
+  zones <- rasterize(musk_seascontwint %>%
+                           filter(range_id == !!id, range == !!range) %>%
+                      sf::st_transform(terra::crs(sm_crop)) %>%
+                        vect(),
+                    sm_crop, touches = TRUE)
+  rowids <- which(month(daterange)>=11&year(daterange)==year|
+          month(daterange)<=3&year(daterange)==(year+1))
+  zonal(sm_crop[[rowids]], zones, "mean", wide = FALSE) %>%
+    mutate(date = daterange[rowids], 
+           range_id = !!id,
+           range = !!range) %>%
+    select(-layer, -zone)
+}
+
+musk_wint_home <- musk_seascontwint %>%
+  filter(season == "Winter",
+         range == "home",
+         seas_length > 115
+         ) %>%
+  pull(range_id) %>%
+  map(function(.x){snow_wint_func(.x, "home")}) %>%
+  list_rbind() 
+musk_wint_core <- musk_seascontwint %>%
+  filter(season == "Winter",
+         range == "core",
+         seas_length > 115
+         ) %>%
+  pull(range_id) %>%
+  map(function(.x){snow_wint_func(.x, "core")}) %>%
+  list_rbind() 
+musk_wint <- bind_rows(musk_wint_home, musk_wint_core)
+```
+
+```{r}
+#| label: wint_mod
+#| dependson: "musk_wint"
+
+musk_wint_sum <- musk_wint %>%
+  group_by(range_id, range) %>%
+  summarise(snow_depth = mean(value)) %>%
+  left_join(musk_seascontwint %>%
+              select(range_id, range, year_min, seas_length, area, Id_Number)) 
+
+musk_wint_sum %>%
+  ggplot(aes(x = snow_depth, y = log(area), colour = Id_Number)) +
+  geom_point(size = 3) +
+  facet_wrap(~range, scales = "free")
+
+wint_home_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+                 data = musk_wint_sum %>% filter(range == "home"))
+summary(wint_home_mod)
+wint_core_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+                 data = musk_wint_sum %>% filter(range == "core"))
+summary(wint_core_mod)
+```
+
+Clearly, there is a negative relationship between snow depth and winter range size: as snow depth increases, the size of winter home ranges tends to decrease. In addition, each muskox with multiple years of data had a smaller winter home range in the year with deeper snow.
+
+It's also worth noting that the three instances with the deepest snow all occurred in 2010, but all three home ranges occurred in spatially distinct areas. There could be another weather variable correlated with years that is responsible for the relationship, but snow depth seems the most plausible given previous research. Also, if we include the three winter home ranges that were only calculated for part of the season (due to starting or ending mid winter), they fit the trend as 2007 and 2011 were also years with deeper snow.
+
+## Calving Season Model
+
+Next we will look at the same relationship for the calving seasons:
+
+```{r}
+#| label: musk_calv
+#| dependson: "load-data"
+
+sm_crop <- terra::rast(here("data/processed/sm_crop.nc"), 
+                       drivers="NETCDF")
+daterange <- seq( as.Date("2007-01-01"), as.Date("2012-12-31"), by="+1 day")
+snow_calv_func <- function(id, range){
+  year <- musk_seascont %>%
+    filter(range_id == !!id, range == !!range) %>%
+    pull(year_min)
+  zones <- rasterize(musk_seascont %>%
+                           filter(range_id == !!id, range == !!range) %>%
+                      sf::st_transform(terra::crs(sm_crop)) %>%
+                        terra::vect(),
+                    sm_crop, touches = TRUE)
+  rowids <- which(month(daterange)==4&year(daterange)==year)
+  zonal(sm_crop[[rowids]], zones, "mean", wide = FALSE) %>%
+    mutate(date = daterange[rowids], 
+           range_id = !!id,
+           range = !!range) %>%
+    select(-layer, -zone)
+}
+
+musk_calv_home <- musk_seascont %>%
+  filter(season == "Calving",
+         range == "home"
+         ) %>%
+  pull(range_id) %>%
+  map(function(.x){snow_calv_func(.x, "home")}) %>%
+  list_rbind() 
+musk_calv_core <- musk_seascont %>%
+  filter(season == "Calving",
+         range == "core"
+         ) %>%
+  pull(range_id) %>%
+  map(function(.x){snow_calv_func(.x, "core")}) %>%
+  list_rbind() 
+musk_calv <- bind_rows(musk_calv_home, musk_calv_core)
+```
+
+```{r}
+#| label: calv_mod
+#| dependson: "musk_calv"
+
+musk_calv_sum <- musk_calv %>%
+  group_by(range_id, range) %>%
+  summarise(snow_depth = mean(value)) %>%
+  left_join(musk_seascont %>%
+              select(range_id, range, year_min, seas_length, area, Id_Number)) 
+
+musk_calv_sum %>%
+  ggplot(aes(x = snow_depth, y = log(area), colour = Id_Number)) +
+  geom_point(size = 3) +
+  facet_wrap(~range, scales = "free")
+
+calv_home_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+                 data = musk_calv_sum %>% filter(range == "home"))
+summary(calv_home_mod)
+calv_core_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+                 data = musk_calv_sum %>% filter(range == "core"))
+summary(calv_core_mod)
+
+```
+
+There is still a negative relationship present between snow depth and calving home range size, but it is no longer significant. Given that we do not actually know which females had calves every year, the presence/absence of calves could have a large impact on the area traversed during this time. For instance, we know that muskox 7010 in 2009 was not seen with a calf during any of the surveys and happens to have the largest home range size during the calving season. Similarly, muskox 7012 in 2009, which had the second largest home range, was not with a calf until May at the earliest. This means 7012 was not restricted from moving around during the deepest parts of the calving season. Removing these two points makes for a much stronger relationship; however this pattern is not universal as there were other muskoxen in 2008 and 2009 that were without calves during April and still had small home ranges. The fact that these muskoxen travel in groups needs to be taken into consideration as well because even if the collared muskoxen does not have a calf, its movements may still be restricted by the movements of the group. Most groups observed in 2008 and 2009 had at least one calf during the calving season. One exception was 7010 in 2009, which was observed to be in a group with a calf at the beginning of April but not in May.
+
+## Summer Season Model
+
+For the summer season, length of season and forage availability are likely to be more important for determining home range size than weather conditions (though extreme heat and bugs in the summer could impact movement as well). Like winter and calving season models, we will stick with one predictor variable to avoid issues with overfitting. In this case, we will look at the percentage of shrubland and grassland within each home range, with the hypothesis that areas with less shrubland/grassland will mean muskoxen will need to travel further to meet their energy demands and consequently have larger home ranges.
+
+We'll start by loading the land cover data and calculating percent cover.
+
+```{r}
+#| label: musk_sum
+#| dependson: "load-data"
+
+lc_2010_crop <- terra::rast(here("data/processed/lc_2010_crop.tif"))
+lc_atts <- readRDS(here("data/processed/lc_atts.rds"))
+### land cover ids 8 and 10 coorespond to the land covers of interest
+lcc_func <- function(id, range){
+  points <- musk_seascont %>%
+    filter(range_id == !!id, range == !!range) %>%
+    sf::st_transform(terra::crs(lc_2010_crop))
+  lc_2010_crop2 <- terra::crop(lc_2010_crop, points)
+  zones <- rasterize(points %>%
+                        terra::vect(),
+                    lc_2010_crop2, touches = TRUE)
+  ct <- crosstab(c(zones, lc_2010_crop2)) %>%
+    as_tibble() %>%
+    mutate(range_id = !!id,
+           range = !!range)
+}
+
+musk_sum_home <- musk_seascont %>%
+  filter(season == "Summer",
+         range == "home") %>%
+  pull(range_id) %>%
+  map(function(.x){lcc_func(.x, "home")}) %>%
+  list_rbind() 
+musk_sum_core <- musk_seascont %>%
+  filter(season == "Summer",
+         range == "core") %>%
+  pull(range_id) %>%
+  map(function(.x){lcc_func(.x, "core")}) %>%
+  list_rbind() 
+musk_sum <- bind_rows(musk_sum_home, musk_sum_core)
+```
+
+```{r}
+#| label: sum_mod
+#| dependson: "musk_sum"
+
+musk_sum_sum <- musk_sum %>%
+  mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
+  group_by(range_id, range) %>%
+  summarise(total = sum(n),
+            for_tot = sum(n*for_lc),
+            for_per = for_tot/total) %>%
+  left_join(musk_seascont %>%
+              select(range_id, range, year_min, seas_length, area, Id_Number)) 
+
+musk_sum_sum %>%
+  ggplot(aes(x = for_per, y = log(area), colour = Id_Number)) +
+  geom_point(size = 3) +
+  facet_wrap(~range, scales = "free")
+
+sum_home_mod <- nlme::lme(log(area)~scale(for_per), random=~1|Id_Number, 
+                 data = musk_sum_sum %>% filter(range == "home"))
+summary(sum_home_mod)
+sum_core_mod <- nlme::lme(log(area)~scale(for_per), random=~1|Id_Number, 
+                 data = musk_sum_sum %>% filter(range == "core"))
+summary(sum_core_mod)
+```
+
+A lot of the variation in home range size is explained by differences in individual muskoxen; i.e. summer home ranges are similar in size across seasons, and we already know that they share high overlap across years.
+
+The relationship with forage percent cover is in opposition to the original hypothesis. Larger home ranges appear to be correlated with a larger percent of forage land cover, though not significant. Maybe if there is a high density of foraging areas, it makes sense to target foraging areas that haven't been visited lately so there is a maximal amount of forage. For individuals in areas with low density of foraging areas, maybe it makes more sense to not travel long distances to new foraging patches and just stay with the ones that are nearby. By this logic, we might expect the area immediately surrounding home ranges to have a low density of forage areas.
+
+Before we compare the areas inside and outside of summer home ranges lets look to see if season length has any effect on summer season size.
+
+```{r}
+#| label: sum_length_mod
+#| dependson: "load-data"
+
+musk_seascont %>%
+  filter(season == "Summer") %>%
+  ggplot(aes(x = seas_length, y = log(area), colour = Id_Number)) +
+  geom_point(size = 3) +
+  facet_wrap(~range, scales = "free")
+
+sum_home_length_mod <- nlme::lme(log(area)~scale(seas_length), 
+                                 random=~1|Id_Number, 
+                                 data = musk_seascont %>%
+                                   filter(season == "Summer",
+                                          range == "home"))
+summary(sum_home_length_mod)
+sum_core_length_mod <- nlme::lme(log(area)~scale(seas_length), 
+                                 random=~1|Id_Number, 
+                                 data = musk_seascont %>%
+                                   filter(season == "Summer",
+                                          range == "core"))
+summary(sum_core_length_mod)
+```
+
+There is no significant relationship. If anything, there is a slight negative trend with season length. In fact, as we observed previously, summer home ranges are fairly consistent in size within individuals despite differences in season length across years (see 7011, 7012, 7013, and 708 in graph above), meaning our previous finding of the availability of foraging patches is probably more important.
+
+# Home Range Extent Models
+
+Next we will compare landscape variables inside and outside of home ranges to better understand hoem range extent.
+
+## Summer Season Model
+
+This part of the Sahtu region is quite rough terrain with prominent mountains. If muskox home ranges are limited in size by topography, it would be more difficult to test for it. It might be more informational to compare topography or land cover within the home range with topography and land cover immediately surrounding the home range. If land cover has a lower proportion of foraging areas or topography is rougher outside of the home range, then maybe these factors are responsible for the size of the home ranges.
+
+We will use a buffer of 7 km to start. This buffer represents the average distance that muskoxen travel between foraging patches, so it is expected that muskoxen could realistically travel to these areas.
+
+```{r}
+#| label: musk_sum_buf
+#| dependson: "load-data"
+#| echo: false
+
+lc_2010_crop <- terra::rast(here("data/processed/lc_2010_crop.tif"))
+lcc_func3 <- function(id){
+  points <- musk_seascont %>%
+    filter(range_id == !!id, range == "home") %>%
+    st_buffer(7000)  %>%
+    st_difference(musk_seascont %>%
+                    filter(range_id == !!id, range == "home")) %>%
+    mutate(group = "buffer") %>%
+    bind_rows(musk_seascont %>%
+                filter(range_id == !!id, range == "home") %>%
+                mutate(group = "home range")) %>%
+    sf::st_transform(terra::crs(lc_2010_crop))
+  lc_2010_crop2 <- terra::crop(lc_2010_crop, points)
+  zones <- rasterize(points %>%
+                        terra::vect(),
+                    lc_2010_crop2, field = "group", touches = TRUE)
+  ct <- crosstab(c(zones, lc_2010_crop2)) %>%
+    as_tibble() %>%
+    mutate(range_id = !!id)
+}
+
+musk_sum_buf <- musk_seascont %>%
+  filter(season == "Summer", range == "home") %>%
+  pull(range_id) %>%
+  map(function(.x){lcc_func3(.x)}) %>%
+  list_rbind() 
+```
+
+```{r}
+#| label: sum_mod_buf
+#| dependson: "musk_sum_buf"
+
+musk_sum_sum3 <- musk_sum_buf %>%
+  mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
+  # ### remove water land cover from calculation of total land cover
+  # filter(Canada2010 != 18) %>%
+  group_by(range_id, group) %>%
+  summarise(total = sum(n),
+            for_tot = sum(n*for_lc),
+            for_per = for_tot/total) %>%
+  left_join(musk_seascont %>%
+              filter(range == "home") %>%
+              select(range_id, year_min, seas_length, area, Id_Number)) 
+
+musk_sum_sum3 %>%
+  ggplot(aes(x = group, y = for_per)) +
+  geom_boxplot() 
+
+sum_mod <- nlme::lme(for_per~group, random=~1|Id_Number/year_min, 
+                 data = musk_sum_sum3)
+summary(sum_mod)
+```
+
+This result agrees with our hypothesis; the percent cover of foraging areas inside the home range is nearly double the percent cover in the immediate area surrounding the home range. This suggests that forage availability may limit muskox. Using smaller buffers of 2km and 5 km produced the same result. Given that many summer home ranges are bordered by lakes, the percent cover of lakes in the surrounding area could be responsible for some differences in forage cover, but even if we remove lakes from the calculation (not shown here), we still get a significant difference.
+
+Let's do the same test but with terrain ruggedness index to assess if the terrain surrounding home ranges is more rough than the terrain within home ranges. We would expect that muskoxen would be less likely to travel through rough terrain
+
+```{r}
+#| label: musk_ter
+#| dependson: "load-data"
+#| echo: false
+
+mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
+lc_2010_crop <- terra::rast(here("data/processed/lc_2010_crop.tif"))
+tri_crop <- terra::terrain(mrdtm_crop, "TRI")
+tri_mask <- terra::mask(tri_crop,lc_2010_crop, maskvalues = 18)
+tri_func <- function(id){
+  points <- musk_seascont %>%
+               filter(range_id == !!id, range == "home") %>%
+               st_buffer(7000) %>%
+               st_difference(musk_seascont %>%
+                               filter(range_id == !!id, range == "home")) %>%
+               mutate(group = "buffer") %>%
+               bind_rows(musk_seascont %>%
+                               filter(range_id == !!id, range == "home") %>%
+                           mutate(group = "home range")) %>%
+              sf::st_transform(terra::crs(tri_mask))
+  tri_mask2 <- terra::crop(tri_mask, points)
+  zones <- rasterize(points %>%
+                        terra::vect(),
+                    tri_mask2, field = "group", touches = TRUE)
+  zonal(tri_mask2, zones, "mean", wide = FALSE, na.rm = TRUE) %>%
+      mutate(range_id = !!id) %>%
+      select(-layer)
+}
+
+musk_ter <- musk_seascont %>%
+  filter(season == "Summer", range == "home") %>%
+  pull(range_id) %>%
+  map(function(.x){tri_func(.x)}) %>%
+  list_rbind() %>%
+  left_join(musk_seascont %>% 
+              filter(range == "home") %>%
+              st_drop_geometry() %>%
+              select(range_id, Id_Number, year_min))
+```
+
+```{r}
+#| label: ter_mod
+#| dependson: "musk_ter"
+
+musk_ter %>%
+  ggplot(aes(x = group, y = value)) +
+  geom_boxplot() 
+
+sum_mod <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
+                 data = musk_ter)
+summary(sum_mod)
+
+```
+
+If anything, it appears that the terrain is more rugged within home ranges though the difference is not huge (20% increase on average). Maybe the land cover they are interested in is more associated with rough terrain such as that close to the mountains.
+
+## Winter Season Model
+
+For the winter season model, we will compare snow depth. We'll use a buffer size equal to the average distance between the home range center and edges.
+
+```{r}
+#| label: musk_snow
+#| dependson: "load-data"
+
+dist_func <- function(id){
+  poly <- musk_seascont %>%
+    filter(range_id == !!id,
+           range == "home") %>%
+    select(geometry)
+  distances <- poly %>% 
+    st_cast("POINT") %>% 
+    st_distance(st_centroid(poly)) %>%
+    mean()
+}
+dist <- musk_seascont %>%
+  filter(season == "Winter",
+         range == "home") %>%
+  pull(range_id) %>%
+  map(function(.x){dist_func(.x)}) %>%
+  unlist() %>%
+  mean()
+
+sm_crop <- terra::rast(here("data/processed/sm_crop.nc"), 
+                       drivers="NETCDF")
+daterange <- seq( as.Date("2007-01-01"), as.Date("2012-12-31"), by="+1 day")
+snow_func <- function(id){
+  year <- musk_seascont %>%
+    filter(range_id == !!id) %>%
+    pull(year_min)
+  ### creating separate polygons because home ranges are small compared to raster
+  ### resolution and so we need to use proportion of cell overlap in our
+  ### calculation
+  points_home <- musk_seascont %>%
+               filter(range_id == !!id, range == "home") %>%
+               mutate(group = "home range") %>%
+              sf::st_transform(terra::crs(sm_crop))
+  points_buff <- musk_seascont %>%
+               filter(range_id == !!id, range == "home") %>%
+               st_buffer(dist) %>%
+               st_difference(musk_seascont %>%
+                               filter(range_id == !!id, range == "home")) %>%
+               mutate(group = "buffer") %>%
+              sf::st_transform(terra::crs(sm_crop))
+  zones_home <- rasterize(points_home %>%
+                        terra::vect(),
+                    sm_crop, cover = TRUE)
+  sum_home <- global(zones_home, "sum", na.rm = TRUE)[,1]
+  zones_buff <- rasterize(points_buff %>%
+                        terra::vect(),
+                    sm_crop, cover = TRUE)
+  sum_buff <- global(zones_buff, "sum", na.rm = TRUE)[,1]
+  rowids <- which(month(daterange)>=11&year(daterange)==year|
+          month(daterange)<=3&year(daterange)==(year+1))
+  temp <- global(sm_crop[[rowids]]*zones_home/sum_home,"sum",na.rm = TRUE)[,1]
+  temp <- global(sm_crop[[rowids]]*zones_buff/sum_buff,"sum",na.rm = TRUE)[,1]
+  tibble(
+    snow_depth = global(sm_crop[[rowids]]*zones_home/sum_home,
+                        "sum",na.rm = TRUE)[,1],
+    date = daterange[rowids], 
+    range_id = !!id,
+    group = "home range") %>%
+    bind_rows(
+      tibble(
+          snow_depth = global(sm_crop[[rowids]]*zones_buff/sum_buff,
+                              "sum",na.rm = TRUE)[,1],
+          date = daterange[rowids], 
+          range_id = !!id,
+          group = "buffer")
+          )
+}
+
+musk_snow <- musk_seascont %>%
+  filter(season == "Winter", range == "home", seas_length>115) %>%
+  pull(range_id) %>%
+  map(function(.x){snow_func(.x)}) %>%
+  list_rbind() 
+```
+
+```{r}
+
+musk_snow2 <- musk_snow %>%
+  group_by(range_id, group) %>%
+  summarise(snow_depth = mean(snow_depth)) %>%
+  left_join(musk_seascont %>%
+              filter(range == "home") %>%
+              select(range_id, year_min, seas_length, area, Id_Number))
+
+musk_snow2 %>%
+  ggplot(aes(x = group, y = snow_depth)) +
+  geom_boxplot() 
+
+wint_mod <- nlme::lme(snow_depth~group, random=~1|Id_Number/year_min, 
+                 data = musk_snow2)
+summary(wint_mod)
+```
+
+The winter home ranges appear to have shallower snow depth compared to the area surrounding the ranges. In fact, only two ranges out of the 11 have deeper snow and these were during years with comparatively less snow. Though the average difference is only 2.3 cm, the snow depth data are quite coarse (3 km resolution), so even the smallest difference is interesting.
+
+## Calving Season Model
+
+```{r}
+#| label: musk_snow_calv
+#| dependson: "musk_snow"
+
+dist <- musk_seascont %>%
+  filter(season == "Calving",
+         range == "home") %>%
+  pull(range_id) %>%
+  map(function(.x){dist_func(.x)}) %>%
+  unlist() %>%
+  mean()
+
+sm_crop <- terra::rast(here("data/processed/sm_crop.nc"), 
+                       drivers="NETCDF")
+daterange <- seq( as.Date("2007-01-01"), as.Date("2012-12-31"), by="+1 day")
+snow_func2 <- function(id){
+  year <- musk_seascont %>%
+    filter(range_id == !!id) %>%
+    pull(year_min)
+  points <- musk_seascont %>%
+               filter(range_id == !!id, range == "home") %>%
+               st_buffer(dist) %>%
+               st_difference(musk_seascont %>%
+                               filter(range_id == !!id, range == "home")) %>%
+               mutate(group = "buffer") %>%
+               bind_rows(musk_seascont %>%
+                               filter(range_id == !!id, range == "home") %>%
+                           mutate(group = "home range")) %>%
+              sf::st_transform(terra::crs(sm_crop))
+  zones <- rasterize(points %>%
+                        terra::vect(),
+                    sm_crop, field = "group", touches = TRUE)
+  rowids <- which(month(daterange)==4&year(daterange)==year)
+  zonal(sm_crop[[rowids]], zones, "mean", wide = FALSE) %>%
+    group_by(group) %>%
+    mutate(date = daterange[rowids], 
+           range_id = !!id) %>%
+    ungroup() %>%
+    select(-layer)
+}
+
+musk_snow_calv <- musk_seascont %>%
+  filter(season == "Calving", range == "home") %>%
+  pull(range_id) %>%
+  map(function(.x){snow_func2(.x)}) %>%
+  list_rbind() 
+```
+
+```{r}
+
+musk_snow_calv2 <- musk_snow_calv %>%
+  group_by(range_id, group) %>%
+  summarise(snow_depth = mean(value)) %>%
+  left_join(musk_seascont %>%
+              filter(range == "home") %>%
+              select(range_id, year_min, seas_length, area, Id_Number))
+
+musk_snow_calv2 %>%
+  ggplot(aes(x = group, y = snow_depth)) +
+  geom_boxplot() 
+
+wint_mod2 <- nlme::lme(snow_depth~group, random=~1|Id_Number/year_min, 
+                 data = musk_snow_calv2)
+summary(wint_mod2)
+```
+
+Once again, the patterns with snow are not as apparent during the calving season. While there is a slight decrease in snow depth for the home range compared to the area surrounding the home range, the difference is not as large or significant. This may be partially due to the fact that the calving range only covers a portion of the full winter range. There might be some other landscape variable that is a better determinant of calving areas (perhaps identified through resource selection analysis).

@@ -35,12 +35,14 @@ buffer <- musk_collar %>%
   sf::st_buffer(dist = 100000)
 
 ### crop land cover data to collar data buffer
-lc_2010_crop <- terra::crop(lc_2010, buffer) %>%
-  ### change numeric values to land classification
-  subst(lc_atts$Value,lc_atts$Classification) 
+lc_2010_crop <- terra::crop(lc_2010, buffer)
+
 
 ## now project land cover to same crs as location data for plotting
+## IMPORTANT: only use this for plotting as the numeric values will not match up anymore
 lc_2010_proj <- lc_2010_crop %>%
+  ### change numeric values to land classification
+  subst(lc_atts$Value,lc_atts$Classification)
   terra::project(y = "epsg:4326") %>%
   terra::crop(musk_collar %>% sf::st_buffer(dist = 10000))
 

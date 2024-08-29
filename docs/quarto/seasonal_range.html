@@ -150,8 +150,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../quarto/annual_range.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Annual Home Range</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../quarto/seasonal_range.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">Seasonal Range</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../quarto/seasonal_range_mod.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home Range Modelling</span></a>
   </div>
 </li>
     </ul>
@@ -458,7 +470,7 @@ Using geom_raster() with maxpixels = 523905.</code></pre>
 <span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(rows), </span>
 <span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>                 <span class="at">names_to =</span> <span class="st">"range_id_compare"</span>, </span>
 <span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>                 <span class="at">values_to =</span> <span class="st">"value"</span>)</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  volume <span class="ot">&lt;-</span> <span class="fu">kerneloverlaphr</span>(temp, <span class="at">method =</span> <span class="st">"PHR"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  volume <span class="ot">&lt;-</span> <span class="fu">kerneloverlaphr</span>(temp, <span class="at">method =</span> <span class="st">"VI"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>(<span class="at">.name_repair =</span> <span class="st">"unique"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">setNames</span>(lookup<span class="sc">$</span>range_id[rows]) <span class="sc">%&gt;%</span></span>
 <span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> lookup<span class="sc">$</span>range_id[rows],</span>
@@ -556,9 +568,8 @@ Using geom_raster() with maxpixels = 523905.</code></pre>
 <span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>musk_ltraj <span class="ot">&lt;-</span> adehabitatLT<span class="sc">::</span><span class="fu">as.ltraj</span>(<span class="at">xy =</span> xy, <span class="at">date =</span> musk_collar_seas<span class="sc">$</span>datetime, <span class="at">id =</span> musk_collar_seas<span class="sc">$</span>range_id)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
-<section id="determinants-of-home-range-size" class="level2">
-<h2 class="anchored" data-anchor-id="determinants-of-home-range-size">Determinants of Home Range Size</h2>
-<p>Now we will look to model variables that are likely to influence the size of home ranges. Since we have few observations per season (sample size 12 - 15), we want 1 - 2 explantory variables per season model. Average snow cover during the winter and calving seasons may impact home range size, with individuals being restricted from moving large distances. During the summer, the percent of landcover suitable for foraging or number of foraging patches may impact the size of home ranges with larger home ranges occurring when individuals need to travel more often or further to get to foraging areas. Other barriers to movement may also affect home range size, including ridges and lakes.</p>
+<section id="section" class="level2">
+<h2 class="anchored" data-anchor-id="section"></h2>
 
 
 </section>
