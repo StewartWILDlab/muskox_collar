@@ -195,21 +195,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>Now we will look to model variables that are likely to influence the size of home ranges. Since we have few observations per season (sample size 12 - 15), we want 1 - 2 explantory variables per season model. Average snow cover during the winter and calving seasons may impact home range size, with individuals being restricted from moving large distances. During the summer, the percent of landcover suitable for foraging or number of foraging patches may impact the size of home ranges with larger home ranges occurring when individuals need to travel more often or further to get to foraging areas. Other barriers to movement may also affect home range size, including ridges and lakes.</p>
+<section id="home-range-size-models" class="level1">
+<h1>Home Range Size Models</h1>
+<p>First we will examine differences in the home range over time for each muskoxen.</p>
 <p>Let’s start by calculating average snow depth within each winter and calving home range. To be consistent across years and individuals, we will estimate mean snow depth across the same period ranging from the start November to the end of March for winter and March for calving. These periods roughly correspond to the shortest seasons across the data and include the most extreme snow depths.</p>
 <section id="winter-season-model" class="level2">
 <h2 class="anchored" data-anchor-id="winter-season-model">Winter Season Model</h2>
-<p>We’ll start by estimating average snow depth for winter and running model with muskox ID as a random effect.</p>
+<p>We’ll start by estimating average snow depth for winter and running model with muskox ID as a random effect. For this model, we will use the winter home range estimates that were limited to the months January-March to control for season length and to focus on the periods of highest snow depth.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>sm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/sm_crop.nc"</span>), </span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>                       <span class="at">drivers=</span><span class="st">"NETCDF"</span>)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>daterange <span class="ot">&lt;-</span> <span class="fu">seq</span>( <span class="fu">as.Date</span>(<span class="st">"2007-01-01"</span>), <span class="fu">as.Date</span>(<span class="st">"2012-12-31"</span>), <span class="at">by=</span><span class="st">"+1 day"</span>)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>snow_wint_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id){</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  year <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>snow_wint_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id, range){</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  year <span class="ot">&lt;-</span> musk_seascontwint <span class="sc">%&gt;%</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(year_min)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>                           <span class="fu">filter</span>(range_id<span class="sc">==!!</span>id) <span class="sc">%&gt;%</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(musk_seascontwint <span class="sc">%&gt;%</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>                           <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>                      sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(sm_crop)) <span class="sc">%&gt;%</span></span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">vect</span>(),</span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>                    sm_crop, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
@@ -217,28 +220,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>          <span class="fu">month</span>(daterange)<span class="sc">&lt;=</span><span class="dv">3</span><span class="sc">&amp;</span><span class="fu">year</span>(daterange)<span class="sc">==</span>(year<span class="sc">+</span><span class="dv">1</span>))</span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">zonal</span>(sm_crop[[rowids]], zones, <span class="st">"mean"</span>, <span class="at">wide =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">date =</span> daterange[rowids], </span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>           <span class="at">range_id =</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>layer, <span class="sc">-</span>zone)</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>musk_wint <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>,</span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>         seas_length <span class="sc">&gt;</span> <span class="dv">120</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_wint_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>           <span class="at">range_id =</span> <span class="sc">!!</span>id,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>           <span class="at">range =</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>layer, <span class="sc">-</span>zone)</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>musk_wint_home <span class="ot">&lt;-</span> musk_seascontwint <span class="sc">%&gt;%</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>,</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"home"</span>,</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>         seas_length <span class="sc">&gt;</span> <span class="dv">115</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_wint_func</span>(.x, <span class="st">"home"</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>musk_wint_core <span class="ot">&lt;-</span> musk_seascontwint <span class="sc">%&gt;%</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>,</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"core"</span>,</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>         seas_length <span class="sc">&gt;</span> <span class="dv">115</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_wint_func</span>(.x, <span class="st">"core"</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>musk_wint <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(musk_wint_home, musk_wint_core)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_wint_sum <span class="ot">&lt;-</span> musk_wint <span class="sc">%&gt;%</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id, range) <span class="sc">%&gt;%</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">snow_depth =</span> <span class="fu">mean</span>(value)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number)) </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascontwint <span class="sc">%&gt;%</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, range, year_min, seas_length, area, Id_Number)) </span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>musk_wint_sum <span class="sc">%&gt;%</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> snow_depth, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>range, <span class="at">scales =</span> <span class="st">"free"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -246,79 +261,119 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>wint_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(snow_depth), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_wint_sum)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(wint_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>wint_home_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(snow_depth), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_wint_sum <span class="sc">%&gt;%</span> <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(wint_home_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
-  Data: musk_wint_sum 
+  Data: musk_wint_sum %&gt;% filter(range == "home") 
        AIC      BIC    logLik
-  22.34219 22.12583 -7.171095
+  34.32077 35.10967 -13.16038
 
 Random effects:
  Formula: ~1 | Id_Number
         (Intercept)  Residual
-StdDev:   0.7877535 0.1060782
+StdDev:    0.492332 0.6685231
 
 Fixed effects:  log(area) ~ scale(snow_depth) 
                       Value Std.Error DF   t-value p-value
-(Intercept)        5.484398 0.3237983  5  16.93770  0.0000
-scale(snow_depth) -1.069169 0.0410584  2 -26.04021  0.0015
+(Intercept)        4.866525 0.2865061  5 16.985768  0.0000
+scale(snow_depth) -0.644951 0.2195478  4 -2.937633  0.0425
  Correlation: 
                   (Intr)
-scale(snow_depth) 0.012 
+scale(snow_depth) 0.011 
 
 Standardized Within-Group Residuals:
        Min         Q1        Med         Q3        Max 
--0.9968353 -0.2792100  0.1007603  0.1881032  0.7798095 
+-1.0467016 -0.6424886 -0.3389149  0.8494387  1.1550301 
 
-Number of Observations: 9
+Number of Observations: 11
+Number of Groups: 6 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>wint_core_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(snow_depth), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_wint_sum <span class="sc">%&gt;%</span> <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"core"</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(wint_core_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed-effects model fit by REML
+  Data: musk_wint_sum %&gt;% filter(range == "core") 
+       AIC      BIC    logLik
+  36.38433 37.17323 -14.19217
+
+Random effects:
+ Formula: ~1 | Id_Number
+        (Intercept)  Residual
+StdDev:   0.4620916 0.7929465
+
+Fixed effects:  log(area) ~ scale(snow_depth) 
+                       Value Std.Error DF   t-value p-value
+(Intercept)        2.4814119 0.3063467  5  8.100011  0.0005
+scale(snow_depth) -0.9490831 0.2596157  4 -3.655723  0.0217
+ Correlation: 
+                  (Intr)
+scale(snow_depth) 0.017 
+
+Standardized Within-Group Residuals:
+       Min         Q1        Med         Q3        Max 
+-0.9943372 -0.7665603 -0.1173302  0.7407403  1.3785272 
+
+Number of Observations: 11
 Number of Groups: 6 </code></pre>
 </div>
 </div>
-<p>Clearly, there is a negative relationship between snow depth and winter range size: as snow depth increases, the size of winter home ranges tends to decrease. There is a slight correlation between the snow depth and season length of -0.64, and more days means more relocations, which can only increase the distribution of space use. This correlation is difficult to interpret as one would expect that a winter with deep snow would, if anything, be associated with longer winter seasons. Of course, the intensity of the winter could be focused on the mid winter, but it still doesn’t explain why we would be seeing a negative correlation. Given the small sample size and the fact that there are only three deep snow seasons in the dataset, this relationship could be spurious. I checked a model with season length as a covariate (with and without snow depth) and in both instances, season length was not close to being significant. Snow depth on the other hand was still nearly significant even when season length was added to the model. In any case, these are very small sample sizes, so any relationships should be taken with a degree of skepticism.</p>
+<p>Clearly, there is a negative relationship between snow depth and winter range size: as snow depth increases, the size of winter home ranges tends to decrease. In addition, each muskox with multiple years of data had a smaller winter home range in the year with deeper snow.</p>
 <p>It’s also worth noting that the three instances with the deepest snow all occurred in 2010, but all three home ranges occurred in spatially distinct areas. There could be another weather variable correlated with years that is responsible for the relationship, but snow depth seems the most plausible given previous research. Also, if we include the three winter home ranges that were only calculated for part of the season (due to starting or ending mid winter), they fit the trend as 2007 and 2011 were also years with deeper snow.</p>
 </section>
 <section id="calving-season-model" class="level2">
 <h2 class="anchored" data-anchor-id="calving-season-model">Calving Season Model</h2>
 <p>Next we will look at the same relationship for the calving seasons:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>sm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/sm_crop.nc"</span>), </span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>                       <span class="at">drivers=</span><span class="st">"NETCDF"</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>daterange <span class="ot">&lt;-</span> <span class="fu">seq</span>( <span class="fu">as.Date</span>(<span class="st">"2007-01-01"</span>), <span class="fu">as.Date</span>(<span class="st">"2012-12-31"</span>), <span class="at">by=</span><span class="st">"+1 day"</span>)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>snow_calv_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id){</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  year <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(year_min)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>                           <span class="fu">filter</span>(range_id<span class="sc">==!!</span>id) <span class="sc">%&gt;%</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>                      sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(sm_crop)) <span class="sc">%&gt;%</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>                        terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>                    sm_crop, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  rowids <span class="ot">&lt;-</span> <span class="fu">which</span>(<span class="fu">month</span>(daterange)<span class="sc">==</span><span class="dv">4</span><span class="sc">&amp;</span><span class="fu">year</span>(daterange)<span class="sc">==</span>year)</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">zonal</span>(sm_crop[[rowids]], zones, <span class="st">"mean"</span>, <span class="at">wide =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">date =</span> daterange[rowids], </span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>           <span class="at">range_id =</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>layer, <span class="sc">-</span>zone)</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>musk_calv <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Calving"</span>,</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>         range_id <span class="sc">!=</span> <span class="st">"706_2009_Calving"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_calv_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>sm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/sm_crop.nc"</span>), </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                       <span class="at">drivers=</span><span class="st">"NETCDF"</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>daterange <span class="ot">&lt;-</span> <span class="fu">seq</span>( <span class="fu">as.Date</span>(<span class="st">"2007-01-01"</span>), <span class="fu">as.Date</span>(<span class="st">"2012-12-31"</span>), <span class="at">by=</span><span class="st">"+1 day"</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>snow_calv_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id, range){</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  year <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(year_min)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>                           <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>                      sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(sm_crop)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                        terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>                    sm_crop, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  rowids <span class="ot">&lt;-</span> <span class="fu">which</span>(<span class="fu">month</span>(daterange)<span class="sc">==</span><span class="dv">4</span><span class="sc">&amp;</span><span class="fu">year</span>(daterange)<span class="sc">==</span>year)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">zonal</span>(sm_crop[[rowids]], zones, <span class="st">"mean"</span>, <span class="at">wide =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">date =</span> daterange[rowids], </span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>           <span class="at">range_id =</span> <span class="sc">!!</span>id,</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>           <span class="at">range =</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>layer, <span class="sc">-</span>zone)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>musk_calv_home <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Calving"</span>,</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"home"</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_calv_func</span>(.x, <span class="st">"home"</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>musk_calv_core <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Calving"</span>,</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"core"</span></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_calv_func</span>(.x, <span class="st">"core"</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>musk_calv <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(musk_calv_home, musk_calv_core)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>musk_calv_sum <span class="ot">&lt;-</span> musk_calv <span class="sc">%&gt;%</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">snow_depth =</span> <span class="fu">mean</span>(value)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number)) </span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>musk_calv_sum <span class="sc">%&gt;%</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> snow_depth, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>musk_calv_sum <span class="ot">&lt;-</span> musk_calv <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id, range) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">snow_depth =</span> <span class="fu">mean</span>(value)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, range, year_min, seas_length, area, Id_Number)) </span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>musk_calv_sum <span class="sc">%&gt;%</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> snow_depth, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>range, <span class="at">scales =</span> <span class="st">"free"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -326,12 +381,12 @@ Number of Groups: 6 </code></pre>
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>calv_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(snow_depth), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_calv_sum)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(calv_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>calv_home_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(snow_depth), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_calv_sum <span class="sc">%&gt;%</span> <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>))</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(calv_home_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
-  Data: musk_calv_sum 
+  Data: musk_calv_sum %&gt;% filter(range == "home") 
        AIC      BIC    logLik
   54.37607 56.63586 -23.18803
 
@@ -355,49 +410,88 @@ Standardized Within-Group Residuals:
 Number of Observations: 15
 Number of Groups: 7 </code></pre>
 </div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>calv_core_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(snow_depth), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_calv_sum <span class="sc">%&gt;%</span> <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"core"</span>))</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(calv_core_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed-effects model fit by REML
+  Data: musk_calv_sum %&gt;% filter(range == "core") 
+       AIC      BIC    logLik
+  71.86365 74.12345 -31.93183
+
+Random effects:
+ Formula: ~1 | Id_Number
+         (Intercept) Residual
+StdDev: 6.581769e-05 2.297216
+
+Fixed effects:  log(area) ~ scale(snow_depth) 
+                       Value Std.Error DF   t-value p-value
+(Intercept)        0.5972181 0.5931385  7  1.006878  0.3475
+scale(snow_depth) -0.0781536 0.6139567  7 -0.127295  0.9023
+ Correlation: 
+                  (Intr)
+scale(snow_depth) 0     
+
+Standardized Within-Group Residuals:
+       Min         Q1        Med         Q3        Max 
+-2.2820457 -0.4284230  0.3188573  0.4717469  1.4035996 
+
+Number of Observations: 15
+Number of Groups: 7 </code></pre>
+</div>
 </div>
 <p>There is still a negative relationship present between snow depth and calving home range size, but it is no longer significant. Given that we do not actually know which females had calves every year, the presence/absence of calves could have a large impact on the area traversed during this time. For instance, we know that muskox 7010 in 2009 was not seen with a calf during any of the surveys and happens to have the largest home range size during the calving season. Similarly, muskox 7012 in 2009, which had the second largest home range, was not with a calf until May at the earliest. This means 7012 was not restricted from moving around during the deepest parts of the calving season. Removing these two points makes for a much stronger relationship; however this pattern is not universal as there were other muskoxen in 2008 and 2009 that were without calves during April and still had small home ranges. The fact that these muskoxen travel in groups needs to be taken into consideration as well because even if the collared muskoxen does not have a calf, its movements may still be restricted by the movements of the group. Most groups observed in 2008 and 2009 had at least one calf during the calving season. One exception was 7010 in 2009, which was observed to be in a group with a calf at the beginning of April but not in May.</p>
 </section>
 <section id="summer-season-model" class="level2">
 <h2 class="anchored" data-anchor-id="summer-season-model">Summer Season Model</h2>
-<p>For the summer season, forage availability is likely to be more important for determining hoe range size than weather conditions (though extreme heat and bugs in the summer could impact movement as well). Like winter and calving season models, we will stick with one predictor variable to avoid issues with overfitting. In this case, we will look at the percentage of shrubland and grassland within each home range, with the hypothesis that areas with less shrubland/grassland will mean muskoxen will need to travel further to meet their energy demands and consequently have larger home ranges.</p>
+<p>For the summer season, length of season and forage availability are likely to be more important for determining home range size than weather conditions (though extreme heat and bugs in the summer could impact movement as well). Like winter and calving season models, we will stick with one predictor variable to avoid issues with overfitting. In this case, we will look at the percentage of shrubland and grassland within each home range, with the hypothesis that areas with less shrubland/grassland will mean muskoxen will need to travel further to meet their energy demands and consequently have larger home ranges.</p>
 <p>We’ll start by loading the land cover data and calculating percent cover.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>lc_2010_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/lc_2010_crop.tif"</span>))</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>lc_atts <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/lc_atts.rds"</span>))</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="do">### land cover ids 8 and 10 coorespond to the land covers of interest</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>lcc_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id){</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  points <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id<span class="sc">==!!</span>id) <span class="sc">%&gt;%</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(lc_2010_crop))</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  lc_2010_crop2 <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">crop</span>(lc_2010_crop, points)</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(points <span class="sc">%&gt;%</span></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>                        terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>                    lc_2010_crop2, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  ct <span class="ot">&lt;-</span> <span class="fu">crosstab</span>(<span class="fu">c</span>(zones, lc_2010_crop2)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="sc">!!</span>id)</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>musk_sum <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">lcc_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>lc_2010_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/lc_2010_crop.tif"</span>))</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>lc_atts <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/lc_atts.rds"</span>))</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="do">### land cover ids 8 and 10 coorespond to the land covers of interest</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>lcc_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id, range){</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  points <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="sc">!!</span>range) <span class="sc">%&gt;%</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(lc_2010_crop))</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  lc_2010_crop2 <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">crop</span>(lc_2010_crop, points)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(points <span class="sc">%&gt;%</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>                        terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>                    lc_2010_crop2, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  ct <span class="ot">&lt;-</span> <span class="fu">crosstab</span>(<span class="fu">c</span>(zones, lc_2010_crop2)) <span class="sc">%&gt;%</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="sc">!!</span>id,</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>           <span class="at">range =</span> <span class="sc">!!</span>range)</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>musk_sum_home <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>,</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">lcc_func</span>(.x, <span class="st">"home"</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>musk_sum_core <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>,</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"core"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">lcc_func</span>(.x, <span class="st">"core"</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>musk_sum <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(musk_sum_home, musk_sum_core)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>musk_sum_sum <span class="ot">&lt;-</span> musk_sum <span class="sc">%&gt;%</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">for_lc =</span> <span class="fu">ifelse</span>(Canada2010<span class="sc">%in%</span><span class="fu">c</span>(<span class="dv">8</span>,<span class="dv">10</span>,<span class="dv">11</span>,<span class="dv">12</span>,<span class="dv">13</span>),<span class="dv">1</span>,<span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n),</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_tot =</span> <span class="fu">sum</span>(n<span class="sc">*</span>for_lc),</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_per =</span> for_tot<span class="sc">/</span>total) <span class="sc">%&gt;%</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number)) </span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>musk_sum_sum <span class="sc">%&gt;%</span></span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> for_per, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>musk_sum_sum <span class="ot">&lt;-</span> musk_sum <span class="sc">%&gt;%</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">for_lc =</span> <span class="fu">ifelse</span>(Canada2010<span class="sc">%in%</span><span class="fu">c</span>(<span class="dv">8</span>,<span class="dv">10</span>,<span class="dv">11</span>,<span class="dv">12</span>,<span class="dv">13</span>),<span class="dv">1</span>,<span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id, range) <span class="sc">%&gt;%</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n),</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_tot =</span> <span class="fu">sum</span>(n<span class="sc">*</span>for_lc),</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_per =</span> for_tot<span class="sc">/</span>total) <span class="sc">%&gt;%</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, range, year_min, seas_length, area, Id_Number)) </span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>musk_sum_sum <span class="sc">%&gt;%</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> for_per, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>range, <span class="at">scales =</span> <span class="st">"free"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -405,12 +499,12 @@ Number of Groups: 7 </code></pre>
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>sum_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(for_per), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_sum_sum)</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>sum_home_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(for_per), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_sum_sum <span class="sc">%&gt;%</span> <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>))</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_home_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
-  Data: musk_sum_sum 
+  Data: musk_sum_sum %&gt;% filter(range == "home") 
        AIC      BIC   logLik
   14.21694 15.80852 -3.10847
 
@@ -434,79 +528,143 @@ Standardized Within-Group Residuals:
 Number of Observations: 13
 Number of Groups: 7 </code></pre>
 </div>
-</div>
-<p>A lot of the variation in home range size is explained by differences in individual muskoxen; i.e.&nbsp;summer home ranges are similar in size across seasons, and we already know that they share high overlap across years.</p>
-<p>The relationship with forage percent cover is in opposition to the original hypothesis. Larger home ranges appear to be correlated with a larger percent of forage land cover, though not significant. Maybe if there is a high density of foraging areas, it makes sense to target foraging areas that haven’t been visited lately so there is a maximal amount of forage. For individuals in areas with low density of foraging areas, maybe it makes more sense to not travel long distances to new foraging patches and just stay with the ones that are nearby. By this logic, we might expect the area immediately surrounding home ranges to have a low density of forage areas.</p>
-<p>We could look at the potential areas for home range, defining it as a circular area around the center of each home range and with a radius equal to the radius of the largest home range. In this instance we would expect the percent cover of forage areas to be positively correlated with home range size, as higher forage availability would lead muskoxen to travel to available patches.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>musk_sum_sum2 <span class="ot">&lt;-</span> musk_sum2 <span class="sc">%&gt;%</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">for_lc =</span> <span class="fu">ifelse</span>(Canada2010<span class="sc">%in%</span><span class="fu">c</span>(<span class="dv">8</span>,<span class="dv">10</span>,<span class="dv">11</span>,<span class="dv">12</span>,<span class="dv">13</span>),<span class="dv">1</span>,<span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n),</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_tot =</span> <span class="fu">sum</span>(n<span class="sc">*</span>for_lc),</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_per =</span> for_tot<span class="sc">/</span>total) <span class="sc">%&gt;%</span></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number)) </span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>musk_sum_sum2 <span class="sc">%&gt;%</span></span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> for_per, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="seasonal_range_mod_files/figure-html/sum_mod2-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>sum_mod2 <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(for_per), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_sum_sum2)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_mod2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>sum_core_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(for_per), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_sum_sum <span class="sc">%&gt;%</span> <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"core"</span>))</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_core_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
-  Data: musk_sum_sum2 
-       AIC      BIC    logLik
-  15.51171 17.10329 -3.755855
+  Data: musk_sum_sum %&gt;% filter(range == "core") 
+      AIC      BIC    logLik
+  28.5491 30.14068 -10.27455
 
 Random effects:
  Formula: ~1 | Id_Number
-        (Intercept)   Residual
-StdDev:   0.6855844 0.09451761
+        (Intercept) Residual
+StdDev:   0.4624548 0.344547
 
 Fixed effects:  log(area) ~ scale(for_per) 
-                  Value Std.Error DF  t-value p-value
-(Intercept)    9.730351 0.2656684  6 36.62593  0.0000
-scale(for_per) 0.197776 0.1713929  5  1.15393  0.3007
+                   Value Std.Error DF  t-value p-value
+(Intercept)     7.475775 0.2033897  6 36.75592  0.0000
+scale(for_per) -0.041506 0.1359836  5 -0.30523  0.7725
  Correlation: 
                (Intr)
-scale(for_per) 0.191 
+scale(for_per) 0.049 
 
 Standardized Within-Group Residuals:
-        Min          Q1         Med          Q3         Max 
--0.87603132 -0.50615577  0.03259927  0.23722677  1.42866632 
+       Min         Q1        Med         Q3        Max 
+-1.2452052 -0.3128850 -0.1099126  0.3078064  1.3706162 
 
 Number of Observations: 13
 Number of Groups: 7 </code></pre>
 </div>
 </div>
-<p>Still no significant relationship. Perhaps topography is more important than the distribution of foraging areas. This part of the Sahtu region is quite rough terrain with prominent mountains. If muskox home ranges are limited in size by topography, it would be more difficult to test for it. It might be more informational to compare topography or land cover within the home range with topography and land cover immediately surrounding the home range. If land cover has a lower proportion of foraging areas or topography is rougher outside of the home range, then maybe these factors are responsible for the size of the home ranges.</p>
+<p>A lot of the variation in home range size is explained by differences in individual muskoxen; i.e.&nbsp;summer home ranges are similar in size across seasons, and we already know that they share high overlap across years.</p>
+<p>The relationship with forage percent cover is in opposition to the original hypothesis. Larger home ranges appear to be correlated with a larger percent of forage land cover, though not significant. Maybe if there is a high density of foraging areas, it makes sense to target foraging areas that haven’t been visited lately so there is a maximal amount of forage. For individuals in areas with low density of foraging areas, maybe it makes more sense to not travel long distances to new foraging patches and just stay with the ones that are nearby. By this logic, we might expect the area immediately surrounding home ranges to have a low density of forage areas.</p>
+<p>Before we compare the areas inside and outside of summer home ranges lets look to see if season length has any effect on summer season size.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> seas_length, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>range, <span class="at">scales =</span> <span class="st">"free"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="seasonal_range_mod_files/figure-html/sum_length_mod-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>sum_home_length_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(seas_length), </span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">data =</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>                                   <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>,</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>                                          range <span class="sc">==</span> <span class="st">"home"</span>))</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_home_length_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed-effects model fit by REML
+  Data: musk_seascont %&gt;% filter(season == "Summer", range == "home") 
+       AIC      BIC    logLik
+  19.26688 20.85847 -5.633442
+
+Random effects:
+ Formula: ~1 | Id_Number
+        (Intercept)  Residual
+StdDev:    0.571339 0.1181319
+
+Fixed effects:  log(area) ~ scale(seas_length) 
+                       Value  Std.Error DF  t-value p-value
+(Intercept)         9.667974 0.21899982  6 44.14604  0.0000
+scale(seas_length) -0.017532 0.03506181  5 -0.50004  0.6383
+ Correlation: 
+                   (Intr)
+scale(seas_length) 0.012 
+
+Standardized Within-Group Residuals:
+        Min          Q1         Med          Q3         Max 
+-0.91514860 -0.45820525 -0.04983494  0.37470354  1.36346760 
+
+Number of Observations: 13
+Number of Groups: 7 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>sum_core_length_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(seas_length), </span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">data =</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>                                   <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>,</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>                                          range <span class="sc">==</span> <span class="st">"core"</span>))</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_core_length_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed-effects model fit by REML
+  Data: musk_seascont %&gt;% filter(season == "Summer", range == "core") 
+       AIC      BIC    logLik
+  29.02305 30.61463 -10.51152
+
+Random effects:
+ Formula: ~1 | Id_Number
+        (Intercept)  Residual
+StdDev:    0.437158 0.3543469
+
+Fixed effects:  log(area) ~ scale(seas_length) 
+                      Value Std.Error DF  t-value p-value
+(Intercept)        7.477336 0.1964249  6 38.06715  0.0000
+scale(seas_length) 0.041025 0.1042371  5  0.39357  0.7101
+ Correlation: 
+                   (Intr)
+scale(seas_length) 0.026 
+
+Standardized Within-Group Residuals:
+       Min         Q1        Med         Q3        Max 
+-1.3339226 -0.3702696 -0.1420074  0.3614694  1.2874125 
+
+Number of Observations: 13
+Number of Groups: 7 </code></pre>
+</div>
+</div>
+<p>There is no significant relationship. If anything, there is a slight negative trend with season length. In fact, as we observed previously, summer home ranges are fairly consistent in size within individuals despite differences in season length across years (see 7011, 7012, 7013, and 708 in graph above), meaning our previous finding of the availability of foraging patches is probably more important.</p>
+</section>
+</section>
+<section id="home-range-extent-models" class="level1">
+<h1>Home Range Extent Models</h1>
+<p>Next we will compare landscape variables inside and outside of home ranges to better understand hoem range extent.</p>
+<section id="summer-season-model-1" class="level2">
+<h2 class="anchored" data-anchor-id="summer-season-model-1">Summer Season Model</h2>
+<p>This part of the Sahtu region is quite rough terrain with prominent mountains. If muskox home ranges are limited in size by topography, it would be more difficult to test for it. It might be more informational to compare topography or land cover within the home range with topography and land cover immediately surrounding the home range. If land cover has a lower proportion of foraging areas or topography is rougher outside of the home range, then maybe these factors are responsible for the size of the home ranges.</p>
 <p>We will use a buffer of 7 km to start. This buffer represents the average distance that muskoxen travel between foraging patches, so it is expected that muskoxen could realistically travel to these areas.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>musk_sum_sum3 <span class="ot">&lt;-</span> musk_sum_buf <span class="sc">%&gt;%</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">for_lc =</span> <span class="fu">ifelse</span>(Canada2010<span class="sc">%in%</span><span class="fu">c</span>(<span class="dv">8</span>,<span class="dv">10</span>,<span class="dv">11</span>,<span class="dv">12</span>,<span class="dv">13</span>),<span class="dv">1</span>,<span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span><span class="al">###</span><span class="co"> remove water land cover from calculation of total land cover</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># filter(Canada2010 != 18) %&gt;%</span></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id) <span class="sc">%&gt;%</span></span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n),</span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_tot =</span> <span class="fu">sum</span>(n<span class="sc">*</span>for_lc),</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_per =</span> for_tot<span class="sc">/</span>total) <span class="sc">%&gt;%</span></span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number)) <span class="sc">%&gt;%</span></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"buffer"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(musk_sum_sum <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"home range"</span>)) </span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>musk_sum_sum3 <span class="sc">%&gt;%</span></span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> for_per)) <span class="sc">+</span></span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>musk_sum_sum3 <span class="ot">&lt;-</span> musk_sum_buf <span class="sc">%&gt;%</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">for_lc =</span> <span class="fu">ifelse</span>(Canada2010<span class="sc">%in%</span><span class="fu">c</span>(<span class="dv">8</span>,<span class="dv">10</span>,<span class="dv">11</span>,<span class="dv">12</span>,<span class="dv">13</span>),<span class="dv">1</span>,<span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span><span class="al">###</span><span class="co"> remove water land cover from calculation of total land cover</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># filter(Canada2010 != 18) %&gt;%</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id, group) <span class="sc">%&gt;%</span></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total =</span> <span class="fu">sum</span>(n),</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_tot =</span> <span class="fu">sum</span>(n<span class="sc">*</span>for_lc),</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>            <span class="at">for_per =</span> for_tot<span class="sc">/</span>total) <span class="sc">%&gt;%</span></span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>              <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number)) </span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>musk_sum_sum3 <span class="sc">%&gt;%</span></span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> for_per)) <span class="sc">+</span></span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -514,35 +672,35 @@ Number of Groups: 7 </code></pre>
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>sum_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(for_per<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_sum_sum3)</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>sum_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(for_per<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_sum_sum3)</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
   Data: musk_sum_sum3 
         AIC       BIC   logLik
-  -55.94533 -50.05506 32.97267
+  -55.35395 -49.46368 32.67697
 
 Random effects:
  Formula: ~1 | Id_Number
         (Intercept)
-StdDev:  0.05237706
+StdDev:  0.05255011
 
  Formula: ~1 | year_min %in% Id_Number
          (Intercept)   Residual
-StdDev: 1.302111e-06 0.04432607
+StdDev: 1.342758e-06 0.04497857
 
 Fixed effects:  for_per ~ group 
                      Value  Std.Error DF  t-value p-value
-(Intercept)     0.11223827 0.02361226 12 4.753389   5e-04
-grouphome range 0.09064685 0.01738612 12 5.213749   2e-04
+(Intercept)     0.11203062 0.02376930 12 4.713249   5e-04
+grouphome range 0.09222127 0.01764205 12 5.227357   2e-04
  Correlation: 
                 (Intr)
-grouphome range -0.368
+grouphome range -0.371
 
 Standardized Within-Group Residuals:
        Min         Q1        Med         Q3        Max 
--2.1331389 -0.3184541 -0.1250636  0.7332672  1.6106138 
+-2.1373943 -0.3266617 -0.1310720  0.7132942  1.6288426 
 
 Number of Observations: 26
 Number of Groups: 
@@ -553,9 +711,9 @@ Number of Groups:
 <p>This result agrees with our hypothesis; the percent cover of foraging areas inside the home range is nearly double the percent cover in the immediate area surrounding the home range. This suggests that forage availability may limit muskox. Using smaller buffers of 2km and 5 km produced the same result. Given that many summer home ranges are bordered by lakes, the percent cover of lakes in the surrounding area could be responsible for some differences in forage cover, but even if we remove lakes from the calculation (not shown here), we still get a significant difference.</p>
 <p>Let’s do the same test but with terrain ruggedness index to assess if the terrain surrounding home ranges is more rough than the terrain within home ranges. We would expect that muskoxen would be less likely to travel through rough terrain</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>musk_ter <span class="sc">%&gt;%</span></span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> value)) <span class="sc">+</span></span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>musk_ter <span class="sc">%&gt;%</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> value)) <span class="sc">+</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -563,9 +721,9 @@ Number of Groups:
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>sum_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(value<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_ter)</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>sum_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(value<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_ter)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
   Data: musk_ter 
@@ -600,52 +758,344 @@ Number of Groups:
 </div>
 </div>
 <p>If anything, it appears that the terrain is more rugged within home ranges though the difference is not huge (20% increase on average). Maybe the land cover they are interested in is more associated with rough terrain such as that close to the mountains.</p>
-<p>Lastly, because there is such a large spread in the length of the summer seasons (~70 days), let’s look at the impact of summer season length on home range size:</p>
+</section>
+<section id="winter-season-model-1" class="level2">
+<h2 class="anchored" data-anchor-id="winter-season-model-1">Winter Season Model</h2>
+<p>For the winter season model, we will compare snow depth. We’ll use a buffer size equal to the average distance between the home range center and edges.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>musk_seascont <span class="sc">%&gt;%</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> seas_length, <span class="at">y =</span> <span class="fu">log</span>(area), <span class="at">colour =</span> Id_Number)) <span class="sc">+</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>dist_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id){</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  poly <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id,</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>           range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(geometry)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  distances <span class="ot">&lt;-</span> poly <span class="sc">%&gt;%</span> </span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_cast</span>(<span class="st">"POINT"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_distance</span>(<span class="fu">st_centroid</span>(poly)) <span class="sc">%&gt;%</span></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mean</span>()</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>dist <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>,</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">dist_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unlist</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mean</span>()</span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>sm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/sm_crop.nc"</span>), </span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>                       <span class="at">drivers=</span><span class="st">"NETCDF"</span>)</span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>daterange <span class="ot">&lt;-</span> <span class="fu">seq</span>( <span class="fu">as.Date</span>(<span class="st">"2007-01-01"</span>), <span class="fu">as.Date</span>(<span class="st">"2012-12-31"</span>), <span class="at">by=</span><span class="st">"+1 day"</span>)</span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>snow_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id){</span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>  year <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-24"><a href="#cb30-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
+<span id="cb30-25"><a href="#cb30-25" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(year_min)</span>
+<span id="cb30-26"><a href="#cb30-26" aria-hidden="true" tabindex="-1"></a>  <span class="do">### creating separate polygons because home ranges are small compared to raster</span></span>
+<span id="cb30-27"><a href="#cb30-27" aria-hidden="true" tabindex="-1"></a>  <span class="do">### resolution and so we need to use proportion of cell overlap in our</span></span>
+<span id="cb30-28"><a href="#cb30-28" aria-hidden="true" tabindex="-1"></a>  <span class="do">### calculation</span></span>
+<span id="cb30-29"><a href="#cb30-29" aria-hidden="true" tabindex="-1"></a>  points_home <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-30"><a href="#cb30-30" aria-hidden="true" tabindex="-1"></a>               <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-31"><a href="#cb30-31" aria-hidden="true" tabindex="-1"></a>               <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"home range"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-32"><a href="#cb30-32" aria-hidden="true" tabindex="-1"></a>              sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(sm_crop))</span>
+<span id="cb30-33"><a href="#cb30-33" aria-hidden="true" tabindex="-1"></a>  points_buff <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-34"><a href="#cb30-34" aria-hidden="true" tabindex="-1"></a>               <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-35"><a href="#cb30-35" aria-hidden="true" tabindex="-1"></a>               <span class="fu">st_buffer</span>(dist) <span class="sc">%&gt;%</span></span>
+<span id="cb30-36"><a href="#cb30-36" aria-hidden="true" tabindex="-1"></a>               <span class="fu">st_difference</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-37"><a href="#cb30-37" aria-hidden="true" tabindex="-1"></a>                               <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb30-38"><a href="#cb30-38" aria-hidden="true" tabindex="-1"></a>               <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"buffer"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-39"><a href="#cb30-39" aria-hidden="true" tabindex="-1"></a>              sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(sm_crop))</span>
+<span id="cb30-40"><a href="#cb30-40" aria-hidden="true" tabindex="-1"></a>  zones_home <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(points_home <span class="sc">%&gt;%</span></span>
+<span id="cb30-41"><a href="#cb30-41" aria-hidden="true" tabindex="-1"></a>                        terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
+<span id="cb30-42"><a href="#cb30-42" aria-hidden="true" tabindex="-1"></a>                    sm_crop, <span class="at">cover =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb30-43"><a href="#cb30-43" aria-hidden="true" tabindex="-1"></a>  sum_home <span class="ot">&lt;-</span> <span class="fu">global</span>(zones_home, <span class="st">"sum"</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)[,<span class="dv">1</span>]</span>
+<span id="cb30-44"><a href="#cb30-44" aria-hidden="true" tabindex="-1"></a>  zones_buff <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(points_buff <span class="sc">%&gt;%</span></span>
+<span id="cb30-45"><a href="#cb30-45" aria-hidden="true" tabindex="-1"></a>                        terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
+<span id="cb30-46"><a href="#cb30-46" aria-hidden="true" tabindex="-1"></a>                    sm_crop, <span class="at">cover =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb30-47"><a href="#cb30-47" aria-hidden="true" tabindex="-1"></a>  sum_buff <span class="ot">&lt;-</span> <span class="fu">global</span>(zones_buff, <span class="st">"sum"</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)[,<span class="dv">1</span>]</span>
+<span id="cb30-48"><a href="#cb30-48" aria-hidden="true" tabindex="-1"></a>  rowids <span class="ot">&lt;-</span> <span class="fu">which</span>(<span class="fu">month</span>(daterange)<span class="sc">&gt;=</span><span class="dv">11</span><span class="sc">&amp;</span><span class="fu">year</span>(daterange)<span class="sc">==</span>year<span class="sc">|</span></span>
+<span id="cb30-49"><a href="#cb30-49" aria-hidden="true" tabindex="-1"></a>          <span class="fu">month</span>(daterange)<span class="sc">&lt;=</span><span class="dv">3</span><span class="sc">&amp;</span><span class="fu">year</span>(daterange)<span class="sc">==</span>(year<span class="sc">+</span><span class="dv">1</span>))</span>
+<span id="cb30-50"><a href="#cb30-50" aria-hidden="true" tabindex="-1"></a>  temp <span class="ot">&lt;-</span> <span class="fu">global</span>(sm_crop[[rowids]]<span class="sc">*</span>zones_home<span class="sc">/</span>sum_home,<span class="st">"sum"</span>,<span class="at">na.rm =</span> <span class="cn">TRUE</span>)[,<span class="dv">1</span>]</span>
+<span id="cb30-51"><a href="#cb30-51" aria-hidden="true" tabindex="-1"></a>  temp <span class="ot">&lt;-</span> <span class="fu">global</span>(sm_crop[[rowids]]<span class="sc">*</span>zones_buff<span class="sc">/</span>sum_buff,<span class="st">"sum"</span>,<span class="at">na.rm =</span> <span class="cn">TRUE</span>)[,<span class="dv">1</span>]</span>
+<span id="cb30-52"><a href="#cb30-52" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(</span>
+<span id="cb30-53"><a href="#cb30-53" aria-hidden="true" tabindex="-1"></a>    <span class="at">snow_depth =</span> <span class="fu">global</span>(sm_crop[[rowids]]<span class="sc">*</span>zones_home<span class="sc">/</span>sum_home,</span>
+<span id="cb30-54"><a href="#cb30-54" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"sum"</span>,<span class="at">na.rm =</span> <span class="cn">TRUE</span>)[,<span class="dv">1</span>],</span>
+<span id="cb30-55"><a href="#cb30-55" aria-hidden="true" tabindex="-1"></a>    <span class="at">date =</span> daterange[rowids], </span>
+<span id="cb30-56"><a href="#cb30-56" aria-hidden="true" tabindex="-1"></a>    <span class="at">range_id =</span> <span class="sc">!!</span>id,</span>
+<span id="cb30-57"><a href="#cb30-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">group =</span> <span class="st">"home range"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-58"><a href="#cb30-58" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bind_rows</span>(</span>
+<span id="cb30-59"><a href="#cb30-59" aria-hidden="true" tabindex="-1"></a>      <span class="fu">tibble</span>(</span>
+<span id="cb30-60"><a href="#cb30-60" aria-hidden="true" tabindex="-1"></a>          <span class="at">snow_depth =</span> <span class="fu">global</span>(sm_crop[[rowids]]<span class="sc">*</span>zones_buff<span class="sc">/</span>sum_buff,</span>
+<span id="cb30-61"><a href="#cb30-61" aria-hidden="true" tabindex="-1"></a>                              <span class="st">"sum"</span>,<span class="at">na.rm =</span> <span class="cn">TRUE</span>)[,<span class="dv">1</span>],</span>
+<span id="cb30-62"><a href="#cb30-62" aria-hidden="true" tabindex="-1"></a>          <span class="at">date =</span> daterange[rowids], </span>
+<span id="cb30-63"><a href="#cb30-63" aria-hidden="true" tabindex="-1"></a>          <span class="at">range_id =</span> <span class="sc">!!</span>id,</span>
+<span id="cb30-64"><a href="#cb30-64" aria-hidden="true" tabindex="-1"></a>          <span class="at">group =</span> <span class="st">"buffer"</span>)</span>
+<span id="cb30-65"><a href="#cb30-65" aria-hidden="true" tabindex="-1"></a>          )</span>
+<span id="cb30-66"><a href="#cb30-66" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb30-67"><a href="#cb30-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-68"><a href="#cb30-68" aria-hidden="true" tabindex="-1"></a>musk_snow <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb30-69"><a href="#cb30-69" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>, range <span class="sc">==</span> <span class="st">"home"</span>, seas_length<span class="sc">&gt;</span><span class="dv">115</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-70"><a href="#cb30-70" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb30-71"><a href="#cb30-71" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">snow_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
+<span id="cb30-72"><a href="#cb30-72" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>musk_snow2 <span class="ot">&lt;-</span> musk_snow <span class="sc">%&gt;%</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(range_id, group) <span class="sc">%&gt;%</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">snow_depth =</span> <span class="fu">mean</span>(snow_depth)) <span class="sc">%&gt;%</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>              <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, year_min, seas_length, area, Id_Number))</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>musk_snow2 <span class="sc">%&gt;%</span></span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> snow_depth)) <span class="sc">+</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="seasonal_range_mod_files/figure-html/sum_length_mod-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="seasonal_range_mod_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>sum_length_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(<span class="fu">log</span>(area)<span class="sc">~</span><span class="fu">scale</span>(seas_length), <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number, </span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_seascont <span class="sc">%&gt;%</span> <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Summer"</span>))</span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(sum_length_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>wint_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(snow_depth<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_snow2)</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(wint_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Linear mixed-effects model fit by REML
-  Data: musk_seascont %&gt;% filter(season == "Summer") 
-       AIC      BIC    logLik
-  19.26688 20.85847 -5.633442
+  Data: musk_snow2 
+        AIC       BIC   logLik
+  -57.31365 -52.33499 33.65683
 
 Random effects:
  Formula: ~1 | Id_Number
-        (Intercept)  Residual
-StdDev:    0.571339 0.1181319
+         (Intercept)
+StdDev: 1.795728e-06
 
-Fixed effects:  log(area) ~ scale(seas_length) 
-                       Value  Std.Error DF  t-value p-value
-(Intercept)         9.667974 0.21899982  6 44.14604  0.0000
-scale(seas_length) -0.017532 0.03506181  5 -0.50004  0.6383
+ Formula: ~1 | year_min %in% Id_Number
+        (Intercept)   Residual
+StdDev:   0.0587992 0.01866914
+
+Fixed effects:  snow_depth ~ group 
+                     Value   Std.Error DF  t-value p-value
+(Intercept)     0.18164546 0.018600787 10 9.765472   0.000
+grouphome range 0.01414474 0.007960546 10 1.776855   0.106
  Correlation: 
-                   (Intr)
-scale(seas_length) 0.012 
+                (Intr)
+grouphome range -0.214
 
 Standardized Within-Group Residuals:
         Min          Q1         Med          Q3         Max 
--0.91514860 -0.45820525 -0.04983494  0.37470354  1.36346760 
+-1.43945096 -0.55824709  0.02055434  0.42290962  1.64777018 
 
-Number of Observations: 13
-Number of Groups: 7 </code></pre>
+Number of Observations: 22
+Number of Groups: 
+              Id_Number year_min %in% Id_Number 
+                      6                      11 </code></pre>
 </div>
 </div>
-<p>There is no significant relationship. If anything, there is a slight negative trend with season length. In fact, as we observed previously, summer home ranges are fairly consistent in size within individuals despite differences in season length across years (see 7011, 7012, 7013, and 708 in graph above), meaning our previous finding of the availability of foraging patches is probably more important. Muskoxen are not going to continuously move further away from their core areas when they have plenty of foraging opportunities already.</p>
+<p>Perhaps the snow cover data is too coarse resolution for this analysis. Some of the winter home ranges only take up less than 10% of a pixel in area so the calculation of snow depth inside and outside of the home ranges is based on a lot fo the same data. We can try to use elevation as a proxy instead.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>mrdtm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/mrdtm_crop.tif"</span>))</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>elev_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id, d){</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  points <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_buffer</span>(d) <span class="sc">%&gt;%</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_difference</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"buffer"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bind_rows</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>                <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>                <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"home range"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(mrdtm_crop))</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>  mrdtm_crop2 <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">crop</span>(mrdtm_crop, points)</span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(points <span class="sc">%&gt;%</span></span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>                       terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>                     mrdtm_crop2, <span class="at">field =</span> <span class="st">"group"</span>, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb34-17"><a href="#cb34-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">zonal</span>(mrdtm_crop2, zones, <span class="st">"mean"</span>, <span class="at">wide =</span> <span class="cn">FALSE</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-18"><a href="#cb34-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
+<span id="cb34-19"><a href="#cb34-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>layer)</span>
+<span id="cb34-20"><a href="#cb34-20" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb34-21"><a href="#cb34-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-22"><a href="#cb34-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-23"><a href="#cb34-23" aria-hidden="true" tabindex="-1"></a>musk_elev <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb34-24"><a href="#cb34-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>, range <span class="sc">==</span> <span class="st">"home"</span>, seas_length<span class="sc">&gt;</span><span class="dv">115</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-25"><a href="#cb34-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb34-26"><a href="#cb34-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">elev_func</span>(.x, dist)}) <span class="sc">%&gt;%</span></span>
+<span id="cb34-27"><a href="#cb34-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb34-28"><a href="#cb34-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb34-29"><a href="#cb34-29" aria-hidden="true" tabindex="-1"></a>              <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-30"><a href="#cb34-30" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb34-31"><a href="#cb34-31" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, Id_Number, year_min))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>musk_elev <span class="sc">%&gt;%</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> value, <span class="at">group =</span> <span class="fu">interaction</span>(Id_Number, year_min),</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="fu">interaction</span>(Id_Number, year_min))) <span class="sc">+</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="seasonal_range_mod_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>elev_mod <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(value<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_elev)</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(elev_mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed-effects model fit by REML
+  Data: musk_elev 
+       AIC      BIC   logLik
+  229.1239 234.1026 -109.562
+
+Random effects:
+ Formula: ~1 | Id_Number
+        (Intercept)
+StdDev:    120.3712
+
+ Formula: ~1 | year_min %in% Id_Number
+        (Intercept) Residual
+StdDev:    37.26204 22.77926
+
+Fixed effects:  value ~ group 
+                   Value Std.Error DF  t-value p-value
+(Intercept)     351.3101  50.96750 10 6.892825  0.0000
+grouphome range  24.0000   9.71311 10 2.470883  0.0331
+ Correlation: 
+                (Intr)
+grouphome range -0.095
+
+Standardized Within-Group Residuals:
+       Min         Q1        Med         Q3        Max 
+-1.2815564 -0.5939720  0.1498559  0.4710288  1.2054520 
+
+Number of Observations: 22
+Number of Groups: 
+              Id_Number year_min %in% Id_Number 
+                      6                      11 </code></pre>
+</div>
+</div>
+<p>Home range are on average higher elevation than the adjacent land, though this difference in elevation is small, around 24 m on average. However, this difference appears to increase as you increase the buffer size, going to 31 m when the buffer size is doubled and 51 m when the buffer size is quadrupled. It’s also worth noting that there is a positive increase in elevation in all but two instances and the largest increases happen at higher elevations. Given previous discussions, there may be two main areas that muskoxen go to during the winter: steep cliffs at high elevations and lake shores at lower elevations.</p>
+<p>Let’s calculate topographic position index to see if winter home ranges would be classified as hilltops</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>mrdtm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/mrdtm_crop.tif"</span>))</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>tpi_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">terrain</span>(mrdtm_crop, <span class="st">"TPI"</span>)</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>tpi_func <span class="ot">&lt;-</span> <span class="cf">function</span>(id){</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>  points <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_buffer</span>(dist) <span class="sc">%&gt;%</span></span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_difference</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"buffer"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bind_rows</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>                <span class="fu">filter</span>(range_id <span class="sc">==</span> <span class="sc">!!</span>id, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>                <span class="fu">mutate</span>(<span class="at">group =</span> <span class="st">"home range"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(tpi_crop))</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a>  tpi_crop2 <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">crop</span>(tpi_crop, points)</span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> <span class="fu">rasterize</span>(points <span class="sc">%&gt;%</span></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a>                       terra<span class="sc">::</span><span class="fu">vect</span>(),</span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a>                     tpi_crop2, <span class="at">field =</span> <span class="st">"group"</span>, <span class="at">touches =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">zonal</span>(tpi_crop2, zones, <span class="st">"mean"</span>, <span class="at">wide =</span> <span class="cn">FALSE</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">range_id =</span> <span class="sc">!!</span>id) <span class="sc">%&gt;%</span></span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>layer)</span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb38-22"><a href="#cb38-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-23"><a href="#cb38-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-24"><a href="#cb38-24" aria-hidden="true" tabindex="-1"></a>musk_tpi <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb38-25"><a href="#cb38-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Winter"</span>, range <span class="sc">==</span> <span class="st">"home"</span>, seas_length<span class="sc">&gt;</span><span class="dv">115</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-26"><a href="#cb38-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb38-27"><a href="#cb38-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">tpi_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
+<span id="cb38-28"><a href="#cb38-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb38-29"><a href="#cb38-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb38-30"><a href="#cb38-30" aria-hidden="true" tabindex="-1"></a>              <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-31"><a href="#cb38-31" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb38-32"><a href="#cb38-32" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, Id_Number, year_min))</span>
+<span id="cb38-33"><a href="#cb38-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-34"><a href="#cb38-34" aria-hidden="true" tabindex="-1"></a>musk_tpi <span class="sc">%&gt;%</span></span>
+<span id="cb38-35"><a href="#cb38-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> value)) <span class="sc">+</span></span>
+<span id="cb38-36"><a href="#cb38-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="seasonal_range_mod_files/figure-html/musk_tpi-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Winter home ranges appear to have a high topographic position index than the adjacent area, meaning they are more likely to be on hill tops. This TPI index uses the default neighborhood size and would likely need to be calibrated to this region to get better estimates of topographic features.</p>
+</section>
+<section id="calving-season-model-1" class="level2">
+<h2 class="anchored" data-anchor-id="calving-season-model-1">Calving Season Model</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>dist_calv <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Calving"</span>,</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>         range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">dist_func</span>(.x)}) <span class="sc">%&gt;%</span></span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unlist</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mean</span>()</span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a>mrdtm_crop <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/mrdtm_crop.tif"</span>))</span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>musk_elev_calv <span class="ot">&lt;-</span> musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"Calving"</span>, range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(range_id) <span class="sc">%&gt;%</span></span>
+<span id="cb39-14"><a href="#cb39-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="cf">function</span>(.x){<span class="fu">elev_func</span>(.x, dist_calv<span class="sc">/</span><span class="dv">2</span>)}) <span class="sc">%&gt;%</span></span>
+<span id="cb39-15"><a href="#cb39-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">list_rbind</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(musk_seascont <span class="sc">%&gt;%</span></span>
+<span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a>              <span class="fu">filter</span>(range <span class="sc">==</span> <span class="st">"home"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>              <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb39-19"><a href="#cb39-19" aria-hidden="true" tabindex="-1"></a>              <span class="fu">select</span>(range_id, Id_Number, year_min))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>musk_elev_calv <span class="sc">%&gt;%</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> group, <span class="at">y =</span> value, <span class="at">group =</span> <span class="fu">interaction</span>(Id_Number, year_min),</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="fu">interaction</span>(Id_Number, year_min))) <span class="sc">+</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="seasonal_range_mod_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>elev_mod2 <span class="ot">&lt;-</span> nlme<span class="sc">::</span><span class="fu">lme</span>(value<span class="sc">~</span>group, <span class="at">random=</span><span class="sc">~</span><span class="dv">1</span><span class="sc">|</span>Id_Number<span class="sc">/</span>year_min, </span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">data =</span> musk_elev_calv)</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(elev_mod2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed-effects model fit by REML
+  Data: musk_elev_calv 
+       AIC      BIC    logLik
+  305.6786 312.3396 -147.8393
+
+Random effects:
+ Formula: ~1 | Id_Number
+        (Intercept)
+StdDev:    141.1757
+
+ Formula: ~1 | year_min %in% Id_Number
+        (Intercept) Residual
+StdDev:    75.53694 11.17788
+
+Fixed effects:  value ~ group 
+                   Value Std.Error DF  t-value p-value
+(Intercept)     402.1253  57.50695 14 6.992639  0.0000
+grouphome range  12.7050   4.08159 14 3.112766  0.0076
+ Correlation: 
+                (Intr)
+grouphome range -0.035
+
+Standardized Within-Group Residuals:
+        Min          Q1         Med          Q3         Max 
+-1.67855407 -0.49213050  0.01235181  0.42840439  1.78309547 
+
+Number of Observations: 30
+Number of Groups: 
+              Id_Number year_min %in% Id_Number 
+                      7                      15 </code></pre>
+</div>
+</div>
+<p>The same relationship with elevation appears to hold for the calving areas as well, suggesting again that relief from deep snow may be the most important thing in the snowy months. The difference is not as large which likely reflects that fact that calving ranges tend to only cover a portion of the total winter range. Again, the difference in elevations increases with larger buffers.</p>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

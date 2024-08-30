@@ -494,6 +494,8 @@ musk_snow <- musk_seascont %>%
 ```
 
 ```{r}
+#| label: snow_mod
+#| dependson: "musk_snow"
 
 musk_snow2 <- musk_snow %>%
   group_by(range_id, group) %>%
@@ -511,15 +513,115 @@ wint_mod <- nlme::lme(snow_depth~group, random=~1|Id_Number/year_min,
 summary(wint_mod)
 ```
 
-The winter home ranges appear to have shallower snow depth compared to the area surrounding the ranges. In fact, only two ranges out of the 11 have deeper snow and these were during years with comparatively less snow. Though the average difference is only 2.3 cm, the snow depth data are quite coarse (3 km resolution), so even the smallest difference is interesting.
+Perhaps the snow cover data is too coarse resolution for this analysis. Some of the winter home ranges only take up less than 10% of a pixel in area so the calculation of snow depth inside and outside of the home ranges is based on a lot fo the same data. We can try to use elevation as a proxy instead.
+
+```{r}
+#| label: musk_elev
+#| dependson: "musk_snow"
+
+mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
+elev_func <- function(id, d){
+  points <- musk_seascont %>%
+    filter(range_id == !!id, range == "home") %>%
+    st_buffer(d) %>%
+    st_difference(musk_seascont %>%
+                    filter(range_id == !!id, range == "home")) %>%
+    mutate(group = "buffer") %>%
+    bind_rows(musk_seascont %>%
+                filter(range_id == !!id, range == "home") %>%
+                mutate(group = "home range")) %>%
+    sf::st_transform(terra::crs(mrdtm_crop))
+  mrdtm_crop2 <- terra::crop(mrdtm_crop, points)
+  zones <- rasterize(points %>%
+                       terra::vect(),
+                     mrdtm_crop2, field = "group", touches = TRUE)
+  zonal(mrdtm_crop2, zones, "mean", wide = FALSE, na.rm = TRUE) %>%
+    mutate(range_id = !!id) %>%
+    select(-layer)
+}
+
+
+musk_elev <- musk_seascont %>%
+  filter(season == "Winter", range == "home", seas_length>115) %>%
+  pull(range_id) %>%
+  map(function(.x){elev_func(.x, dist)}) %>%
+  list_rbind() %>%
+  left_join(musk_seascont %>%
+              filter(range == "home") %>%
+              st_drop_geometry() %>%
+              select(range_id, Id_Number, year_min))
+```
+
+```{r}
+#| label: elev_mod
+#| dependson: "musk_elev"
+
+musk_elev %>%
+  ggplot(aes(x = group, y = value, group = interaction(Id_Number, year_min),
+             colour = interaction(Id_Number, year_min))) +
+  geom_line() 
+
+elev_mod <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
+                 data = musk_elev)
+summary(elev_mod)
+```
+
+Home range are on average higher elevation than the adjacent land, though this difference in elevation is small, around 24 m on average. However, this difference appears to increase as you increase the buffer size, going to 31 m when the buffer size is doubled and 51 m when the buffer size is quadrupled. It's also worth noting that there is a positive increase in elevation in all but two instances and the largest increases happen at higher elevations. Given previous discussions, there may be two main areas that muskoxen go to during the winter: steep cliffs at high elevations and lake shores at lower elevations.
+
+Let's calculate topographic position index to see if winter home ranges would be classified as hilltops
+
+```{r}
+#| label: musk_tpi
+#| dependson: "load-data"
+
+mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
+tpi_crop <- terra::terrain(mrdtm_crop, "TPI")
+tpi_func <- function(id){
+  points <- musk_seascont %>%
+    filter(range_id == !!id, range == "home") %>%
+    st_buffer(dist) %>%
+    st_difference(musk_seascont %>%
+                    filter(range_id == !!id, range == "home")) %>%
+    mutate(group = "buffer") %>%
+    bind_rows(musk_seascont %>%
+                filter(range_id == !!id, range == "home") %>%
+                mutate(group = "home range")) %>%
+    sf::st_transform(terra::crs(tpi_crop))
+  tpi_crop2 <- terra::crop(tpi_crop, points)
+  zones <- rasterize(points %>%
+                       terra::vect(),
+                     tpi_crop2, field = "group", touches = TRUE)
+  zonal(tpi_crop2, zones, "mean", wide = FALSE, na.rm = TRUE) %>%
+    mutate(range_id = !!id) %>%
+    select(-layer)
+}
+
+
+musk_tpi <- musk_seascont %>%
+  filter(season == "Winter", range == "home", seas_length>115) %>%
+  pull(range_id) %>%
+  map(function(.x){tpi_func(.x)}) %>%
+  list_rbind() %>%
+  left_join(musk_seascont %>%
+              filter(range == "home") %>%
+              st_drop_geometry() %>%
+              select(range_id, Id_Number, year_min))
+
+musk_tpi %>%
+  ggplot(aes(x = group, y = value)) +
+  geom_boxplot() 
+
+```
+
+Winter home ranges appear to have a high topographic position index than the adjacent area, meaning they are more likely to be on hill tops. This TPI index uses the default neighborhood size and would likely need to be calibrated to this region to get better estimates of topographic features.
 
 ## Calving Season Model
 
 ```{r}
-#| label: musk_snow_calv
-#| dependson: "musk_snow"
+#| label: musk_elev_calv
+#| dependson: "musk_elev"
 
-dist <- musk_seascont %>%
+dist_calv <- musk_seascont %>%
   filter(season == "Calving",
          range == "home") %>%
   pull(range_id) %>%
@@ -527,58 +629,31 @@ dist <- musk_seascont %>%
   unlist() %>%
   mean()
 
-sm_crop <- terra::rast(here("data/processed/sm_crop.nc"), 
-                       drivers="NETCDF")
-daterange <- seq( as.Date("2007-01-01"), as.Date("2012-12-31"), by="+1 day")
-snow_func2 <- function(id){
-  year <- musk_seascont %>%
-    filter(range_id == !!id) %>%
-    pull(year_min)
-  points <- musk_seascont %>%
-               filter(range_id == !!id, range == "home") %>%
-               st_buffer(dist) %>%
-               st_difference(musk_seascont %>%
-                               filter(range_id == !!id, range == "home")) %>%
-               mutate(group = "buffer") %>%
-               bind_rows(musk_seascont %>%
-                               filter(range_id == !!id, range == "home") %>%
-                           mutate(group = "home range")) %>%
-              sf::st_transform(terra::crs(sm_crop))
-  zones <- rasterize(points %>%
-                        terra::vect(),
-                    sm_crop, field = "group", touches = TRUE)
-  rowids <- which(month(daterange)==4&year(daterange)==year)
-  zonal(sm_crop[[rowids]], zones, "mean", wide = FALSE) %>%
-    group_by(group) %>%
-    mutate(date = daterange[rowids], 
-           range_id = !!id) %>%
-    ungroup() %>%
-    select(-layer)
-}
+mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
 
-musk_snow_calv <- musk_seascont %>%
+musk_elev_calv <- musk_seascont %>%
   filter(season == "Calving", range == "home") %>%
   pull(range_id) %>%
-  map(function(.x){snow_func2(.x)}) %>%
-  list_rbind() 
+  map(function(.x){elev_func(.x, dist_calv/2)}) %>%
+  list_rbind() %>%
+  left_join(musk_seascont %>%
+              filter(range == "home") %>%
+              st_drop_geometry() %>%
+              select(range_id, Id_Number, year_min))
 ```
 
 ```{r}
+#| label: elev_mod2
+#| dependson: "musk_elev_calv"
 
-musk_snow_calv2 <- musk_snow_calv %>%
-  group_by(range_id, group) %>%
-  summarise(snow_depth = mean(value)) %>%
-  left_join(musk_seascont %>%
-              filter(range == "home") %>%
-              select(range_id, year_min, seas_length, area, Id_Number))
+musk_elev_calv %>%
+  ggplot(aes(x = group, y = value, group = interaction(Id_Number, year_min),
+             colour = interaction(Id_Number, year_min))) +
+  geom_line() 
 
-musk_snow_calv2 %>%
-  ggplot(aes(x = group, y = snow_depth)) +
-  geom_boxplot() 
-
-wint_mod2 <- nlme::lme(snow_depth~group, random=~1|Id_Number/year_min, 
-                 data = musk_snow_calv2)
-summary(wint_mod2)
+elev_mod2 <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
+                 data = musk_elev_calv)
+summary(elev_mod2)
 ```
 
-Once again, the patterns with snow are not as apparent during the calving season. While there is a slight decrease in snow depth for the home range compared to the area surrounding the home range, the difference is not as large or significant. This may be partially due to the fact that the calving range only covers a portion of the full winter range. There might be some other landscape variable that is a better determinant of calving areas (perhaps identified through resource selection analysis).
+The same relationship with elevation appears to hold for the calving areas as well, suggesting again that relief from deep snow may be the most important thing in the snowy months. The difference is not as large which likely reflects that fact that calving ranges tend to only cover a portion of the total winter range. Again, the difference in elevations increases with larger buffers.
