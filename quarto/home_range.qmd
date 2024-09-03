@@ -1,5 +1,5 @@
 ---
-title: "Home Range"
+title: "Lifetime Home Range"
 format: html
 editor: visual
 editor_options: 
@@ -260,6 +260,7 @@ We can use kernel density estimates that account for these underlying movement m
 
 best_fit <- fit[1,]
 akde <- mapply(function(x,y){akde(x,y)},musk_tel,best_fit)
+saveRDS(akde, here("output/akde.rds"))
 EXT <- lapply(akde, extent, level=0.95)
 for(i in 1:length(akde)){
   COL <- color(musk_tel[[i]],by='time')
@@ -314,38 +315,115 @@ There does not appear to be a strong relationship between the days that a collar
 
 The range of home range sizes overlaps with a study conducted for 11 muskoxen in Bathhurst, Devon, and Cornwallis (233 - 2494 km2; Anderson and Ferguson, 2016). They used minimum convext polygons with up to three years of data for each muskox.
 
+# Influence of Sample Size
+
+Let's explore the impact of sample size on home range estimation to see if a cutoff is appropriate for estimating home range size.
+
 ```{r, fig.height=4}
-#| label: musk_var_cv
+#| label: musk_sub
 #| dependson: "load-data"
 #| echo: FALSE
 
-# musk_7011 <- musk_move %>%
-#   filter(individual.local.identifier == 7011) %>%
-#   mutate(datetime = as.POSIXct(timestamp))
-# musk_move_cv <- musk_7011 %>%
-#   bind_rows(musk_7011 %>% 
-#               filter(datetime < min(datetime)+(365/2)*24*60*60) %>%
-#               mutate(individual.local.identifier = 7011.1)) %>%
-#   bind_rows(musk_7011 %>% 
-#               filter(datetime < min(datetime)+(365)*24*60*60) %>%
-#               mutate(individual.local.identifier = 7011.2)) %>%
-#   bind_rows(musk_7011 %>% 
-#               filter(datetime < min(datetime)+(365*1.5)*24*60*60) %>%
-#               mutate(individual.local.identifier = 7011.3))
-# musk_tel_cv <- as.telemetry(musk_move_cv)
-# musk_var_cv <- lapply(musk_tel_cv, variogram, fast = FALSE)
-# for (i in 1:length(musk_var_cv)){plot(musk_var_cv[i], fraction = 0.65);title(musk_var_cv[[i]]@info$identity)}
-# 
-# musk_var_cv_mod <- lapply(musk_var_cv, variogram.fit, interactive = FALSE)
-# fit_cv <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},musk_tel_cv,musk_var_cv_mod)
-# 
-# akde <- list(akde(musk_tel_cv[[1]],fit_cv[,1][[1]]),
-#              akde(musk_tel_cv[[2]],fit_cv[,2][[1]]),
-#              akde(musk_tel_cv[[3]],fit_cv[,3][[1]]),
-#              akde(musk_tel_cv[[4]],fit_cv[,4][[1]]))
-# plot(musk_tel_cv[[1]],UD=akde[[2]])
-# plot(musk_tel_cv[[1]],UD=akde[[3]])
-# plot(musk_tel_cv[[1]],UD=akde[[4]])
-# plot(musk_tel_cv[[1]],UD=akde[[1]])
+musk_708_1y <- musk_move %>%
+  ### keep muskox with 2 or more years of data (708 is close)
+  filter(individual.local.identifier == 708) %>%
+  mutate(date = as.Date(timestamp),
+         individual.local.identifier = str_c(individual.local.identifier,"_1y")) %>%
+  group_by(individual.local.identifier) %>%
+  filter(date <= min(date)+365)
+musk_move_708 <-  musk_move %>%
+  filter(individual.local.identifier == 708) %>%
+  mutate(individual.local.identifier = str_c(individual.local.identifier,"_full")) %>%
+  bind_rows(musk_708_1y)
+musk_tel_708 <- as.telemetry(musk_move_708)
+musk_var_708 <- lapply(musk_tel_708, variogram, CI="Gauss", fast = TRUE)
+musk_mod_708 <- lapply(musk_var_708, variogram.fit, interactive = FALSE)
+# fit_708 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},
+#                  musk_tel_708, musk_mod_708)
+# saveRDS(fit_708, here("output/musk_var_fit_708.rds"))
+fit_708 <- readRDS(here("output/musk_var_fit_708.rds"))
+best_fit_708 <- fit_708[1,]
+akde_708 <- akde(musk_tel_708, best_fit_708)
+overlap_708 <- overlap(akde_708)
+overlap_708
 
+musk_7013_1y <- musk_move %>%
+  filter(individual.local.identifier == 7013) %>%
+  mutate(date = as.Date(timestamp),
+         individual.local.identifier = str_c(individual.local.identifier,"_1y")) %>%
+  group_by(individual.local.identifier) %>%
+  filter(date <= min(date)+365)
+musk_move_7013 <-  musk_move %>%
+  filter(individual.local.identifier == 7013) %>%
+  mutate(individual.local.identifier = str_c(individual.local.identifier,"_full")) %>%
+  bind_rows(musk_7013_1y)
+musk_tel_7013 <- as.telemetry(musk_move_7013)
+musk_var_7013 <- lapply(musk_tel_7013, variogram, CI="Gauss", fast = TRUE)
+musk_mod_7013 <- lapply(musk_var_7013, variogram.fit, interactive = FALSE)
+# fit_7013 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},
+#                  musk_tel_7013, musk_mod_7013)
+# saveRDS(fit_7013, here("output/musk_var_fit_7013.rds"))
+fit_7013 <- readRDS(here("output/musk_var_fit_7013.rds"))
+best_fit_7013 <- fit_7013[1,]
+akde_7013 <- akde(musk_tel_7013, best_fit_7013)
+overlap_7013 <- overlap(akde_7013)
+overlap_7013
+
+musk_7012_1y <- musk_move %>%
+  filter(individual.local.identifier == 7012) %>%
+  mutate(date = as.Date(timestamp),
+         individual.local.identifier = str_c(individual.local.identifier,"_1y")) %>%
+  group_by(individual.local.identifier) %>%
+  filter(date <= min(date)+365)
+musk_7012_2y <- musk_move %>%
+  filter(individual.local.identifier == 7012) %>%
+  mutate(date = as.Date(timestamp),
+         individual.local.identifier = str_c(individual.local.identifier,"_2y")) %>%
+  group_by(individual.local.identifier) %>%
+  filter(date <= min(date)+(365*2))
+musk_move_7012 <-  musk_move %>%
+  filter(individual.local.identifier == 7012) %>%
+  mutate(individual.local.identifier = str_c(individual.local.identifier,"_full")) %>%
+  bind_rows(musk_7012_1y) %>%
+  bind_rows(musk_7012_2y)
+musk_tel_7012 <- as.telemetry(musk_move_7012)
+musk_var_7012 <- lapply(musk_tel_7012, variogram, CI="Gauss", fast = TRUE)
+musk_mod_7012 <- lapply(musk_var_7012, variogram.fit, interactive = FALSE)
+# fit_7012 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},
+#                  musk_tel_7012, musk_mod_7012)
+# saveRDS(fit_7012, here("output/musk_var_fit_7012.rds"))
+fit_7012 <- readRDS(here("output/musk_var_fit_7012.rds"))
+best_fit_7012 <- fit_7012[1,]
+akde_7012 <- akde(musk_tel_7012, best_fit_7012)
+overlap_7012 <- overlap(akde_7012)
+overlap_7012
+
+musk_7011_1y <- musk_move %>%
+  filter(individual.local.identifier == 7011) %>%
+  mutate(date = as.Date(timestamp),
+         individual.local.identifier = str_c(individual.local.identifier,"_1y")) %>%
+  group_by(individual.local.identifier) %>%
+  filter(date <= min(date)+365)
+musk_7011_2y <- musk_move %>%
+  filter(individual.local.identifier == 7011) %>%
+  mutate(date = as.Date(timestamp),
+         individual.local.identifier = str_c(individual.local.identifier,"_2y")) %>%
+  group_by(individual.local.identifier) %>%
+  filter(date <= min(date)+(365*2))
+musk_move_7011 <-  musk_move %>%
+  filter(individual.local.identifier == 7011) %>%
+  mutate(individual.local.identifier = str_c(individual.local.identifier,"_full")) %>%
+  bind_rows(musk_7011_1y) %>%
+  bind_rows(musk_7011_2y)
+musk_tel_7011 <- as.telemetry(musk_move_7011)
+musk_var_7011 <- lapply(musk_tel_7011, variogram, CI="Gauss", fast = TRUE)
+musk_mod_7011 <- lapply(musk_var_7011, variogram.fit, interactive = FALSE)
+# fit_7011 <- mapply(function(x,y){ctmm.select(x,y,verbose = TRUE,cores = 3)},
+#                  musk_tel_7011, musk_mod_7011)
+# saveRDS(fit_7011, here("output/musk_var_fit_7011.rds"))
+fit_7011 <- readRDS(here("output/musk_var_fit_7011.rds"))
+best_fit_7011 <- fit_7011[1,]
+akde_7011 <- akde(musk_tel_7011, best_fit_7011)
+overlap_7011 <- overlap(akde_7011)
+overlap_7011
 ```

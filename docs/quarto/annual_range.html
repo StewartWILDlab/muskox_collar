@@ -145,7 +145,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../quarto/home_range.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Home Range</span></a>
+ <span class="menu-text">Lifetime Home Range</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -158,6 +158,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <div class="sidebar-item-container"> 
   <a href="../quarto/seasonal_range.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Seasonal Range</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../quarto/seasonal_range_mod.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home Range Modelling</span></a>
   </div>
 </li>
     </ul>
@@ -201,8 +207,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="st">"+proj=utm +zone=9"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_mcp <span class="ot">&lt;-</span> <span class="fu">mcp</span>(musk_annual <span class="sc">%&gt;%</span> <span class="fu">select</span>(range_id) <span class="sc">%&gt;%</span> <span class="fu">as_Spatial</span>(),</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">percent =</span> <span class="dv">95</span>, <span class="at">unout =</span> <span class="st">"km"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>musk_mcp <span class="ot">&lt;-</span> <span class="fu">mcp</span>(musk_annual <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">select</span>(range_id) <span class="sc">%&gt;%</span> <span class="fu">as_Spatial</span>(),</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">percent =</span> <span class="dv">95</span>, <span class="at">unout =</span> <span class="st">"km"</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(musk_mcp, <span class="fu">here</span>(<span class="st">"output/musk_mcp.rds"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">

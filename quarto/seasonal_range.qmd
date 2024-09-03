@@ -84,6 +84,13 @@ musk_collar_seas <- musk_season_length %>%
   mutate(range_id = factor(range_id)) %>%
   arrange(range_id)
 
+musk_collar_seas %>%
+  st_drop_geometry() %>%
+  group_by(range_id, season) %>%
+  summarise(length = median(seas_length)) %>%
+  group_by(season) %>%
+  summarise(yday = mean(length))
+
 xy <- musk_collar_seas %>%
   sf::st_transform("+proj=utm +zone=9") %>%
   sf::st_coordinates()
@@ -243,6 +250,7 @@ musk_seasrange <- map(musk_bb, function(x){kernel.area(x,percent = c(50,95),unou
               sf::st_drop_geometry() %>%
               dplyr::select(range_id,Id_Number,year_min,season) %>% 
               distinct())
+saveRDS(musk_seasrange, here("output/musk_seasrange.rds"))
 
 musk_seasrange %>%
   ggplot(aes(x = Id_Number, y = range_95, colour = factor(year_min))) +
@@ -324,6 +332,8 @@ musk_overlap <- map(unique(lookup$group), function(.x){overlap_func(.x)}) %>%
               st_drop_geometry() %>%
               dplyr::select(range_id, Id_Number, year_min, season) %>%
               distinct())
+
+saveRDS(musk_overlap, here("output/musk_overlap.rds"))
 ```
 
 Let's plot the overlap metrics. The first graph shows the percent overlap of an individual's 95% home range contour from different seasons and years. Home rqanges represented by columns are compared against home ranges represented by rows and separated by different year lags.

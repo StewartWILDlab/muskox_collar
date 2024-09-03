@@ -47,9 +47,9 @@ musk_annual <- musk_collar_filt  %>%
 #| label: musk_mcp
 #| dependson: "musk_annual"
 
-musk_mcp <- mcp(musk_annual %>% select(range_id) %>% as_Spatial(),
+musk_mcp <- mcp(musk_annual %>% dplyr::select(range_id) %>% as_Spatial(),
                 percent = 95, unout = "km")
-
+saveRDS(musk_mcp, here("output/musk_mcp.rds"))
 ```
 
 ```{r, fig.height=6, fig.width=8}

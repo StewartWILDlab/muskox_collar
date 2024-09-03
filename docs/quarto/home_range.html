@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>NWT Muskox Collar Project - Home Range</title>
+<title>NWT Muskox Collar Project - Lifetime Home Range</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -113,7 +113,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/home_range.html">Home Range</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/home_range.html">Lifetime Home Range</a></li></ol></nav>
         <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -145,13 +145,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../quarto/home_range.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">Home Range</span></a>
+ <span class="menu-text">Lifetime Home Range</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../quarto/annual_range.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Annual Home Range</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../quarto/seasonal_range.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Seasonal Range</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../quarto/seasonal_range_mod.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home Range Modelling</span></a>
   </div>
 </li>
     </ul>
@@ -165,7 +177,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Home Range</h1>
+<h1 class="title">Lifetime Home Range</h1>
 </div>
 
 
@@ -944,14 +956,15 @@ OUf anisotropic 1048.54150    0.000000 278.57428</code></pre>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>best_fit <span class="ot">&lt;-</span> fit[<span class="dv">1</span>,]</span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>akde <span class="ot">&lt;-</span> <span class="fu">mapply</span>(<span class="cf">function</span>(x,y){<span class="fu">akde</span>(x,y)},musk_tel,best_fit)</span>
-<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>EXT <span class="ot">&lt;-</span> <span class="fu">lapply</span>(akde, extent, <span class="at">level=</span><span class="fl">0.95</span>)</span>
-<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(akde)){</span>
-<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>  COL <span class="ot">&lt;-</span> <span class="fu">color</span>(musk_tel[[i]],<span class="at">by=</span><span class="st">'time'</span>)</span>
-<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(musk_tel[[i]],<span class="at">UD=</span>akde[[i]],</span>
-<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">xlim=</span>EXT[[i]]<span class="sc">$</span>x,<span class="at">ylim=</span>EXT[[i]]<span class="sc">$</span>y,</span>
-<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> COL, <span class="at">lwd=</span><span class="dv">4</span>);</span>
-<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">title</span>(<span class="fu">names</span>(musk_tel)[[i]])</span>
-<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>  }</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(akde, <span class="fu">here</span>(<span class="st">"output/akde.rds"</span>))</span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>EXT <span class="ot">&lt;-</span> <span class="fu">lapply</span>(akde, extent, <span class="at">level=</span><span class="fl">0.95</span>)</span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(akde)){</span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>  COL <span class="ot">&lt;-</span> <span class="fu">color</span>(musk_tel[[i]],<span class="at">by=</span><span class="st">'time'</span>)</span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(musk_tel[[i]],<span class="at">UD=</span>akde[[i]],</span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">xlim=</span>EXT[[i]]<span class="sc">$</span>x,<span class="at">ylim=</span>EXT[[i]]<span class="sc">$</span>y,</span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> COL, <span class="at">lwd=</span><span class="dv">4</span>);</span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">title</span>(<span class="fu">names</span>(musk_tel)[[i]])</span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>  }</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -1023,6 +1036,136 @@ OUf anisotropic 1048.54150    0.000000 278.57428</code></pre>
 </div>
 <p>There does not appear to be a strong relationship between the days that a collar was active and the size of the home range. The muskox with the second most number of days has the highest home range estimate, but the muskox with the least amount of days has the second highest estimate.</p>
 <p>The range of home range sizes overlaps with a study conducted for 11 muskoxen in Bathhurst, Devon, and Cornwallis (233 - 2494 km2; Anderson and Ferguson, 2016). They used minimum convext polygons with up to three years of data for each muskox.</p>
+</section>
+<section id="influence-of-sample-size" class="level1">
+<h1>Influence of Sample Size</h1>
+<p>Let’s explore the impact of sample size on home range estimation to see if a cutoff is appropriate for estimating home range size.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>$DOF
+             708_1y   708_full
+708_1y          Inf 0.02654134
+708_full 0.02654134        Inf
+
+$CI
+, , low
+
+            708_1y  708_full
+708_1y   1.0000000 0.9739439
+708_full 0.9739439 1.0000000
+
+, , est
+
+            708_1y  708_full
+708_1y   1.0000000 0.9985354
+708_full 0.9985354 1.0000000
+
+, , high
+
+         708_1y 708_full
+708_1y        1        1
+708_full      1        1
+
+
+attr(,"class")
+[1] "overlap"</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$DOF
+             7013_1y  7013_full
+7013_1y          Inf 0.02370321
+7013_full 0.02370321        Inf
+
+$CI
+, , low
+
+            7013_1y 7013_full
+7013_1y   1.0000000 0.9304939
+7013_full 0.9304939 1.0000000
+
+, , est
+
+            7013_1y 7013_full
+7013_1y   1.0000000 0.9962163
+7013_full 0.9962163 1.0000000
+
+, , high
+
+          7013_1y 7013_full
+7013_1y         1         1
+7013_full       1         1
+
+
+attr(,"class")
+[1] "overlap"</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$DOF
+             7012_1y     7012_2y   7012_full
+7012_1y          Inf 0.010787278 0.063450291
+7012_2y   0.01078728         Inf 0.001045029
+7012_full 0.06345029 0.001045029         Inf
+
+$CI
+, , low
+
+            7012_1y   7012_2y 7012_full
+7012_1y   1.0000000 0.7788884 0.7077171
+7012_2y   0.7788884 1.0000000 0.9198961
+7012_full 0.7077171 0.9198961 1.0000000
+
+, , est
+
+            7012_1y   7012_2y 7012_full
+7012_1y   1.0000000 0.9910153 0.9716109
+7012_2y   0.9910153 1.0000000 0.9990379
+7012_full 0.9716109 0.9990379 1.0000000
+
+, , high
+
+          7012_1y 7012_2y 7012_full
+7012_1y         1       1         1
+7012_2y         1       1         1
+7012_full       1       1         1
+
+
+attr(,"class")
+[1] "overlap"</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$DOF
+             7011_1y    7011_2y  7011_full
+7011_1y          Inf 0.04519169 0.25421999
+7011_2y   0.04519169        Inf 0.01962155
+7011_full 0.25421999 0.01962155        Inf
+
+$CI
+, , low
+
+            7011_1y   7011_2y 7011_full
+7011_1y   1.0000000 0.8329295 0.6522886
+7011_2y   0.8329295 1.0000000 0.8583128
+7011_full 0.6522886 0.8583128 1.0000000
+
+, , est
+
+            7011_1y   7011_2y 7011_full
+7011_1y   1.0000000 0.9870628 0.9537464
+7011_2y   0.9870628 1.0000000 0.9926771
+7011_full 0.9537464 0.9926771 1.0000000
+
+, , high
+
+          7011_1y 7011_2y 7011_full
+7011_1y         1       1         1
+7011_2y         1       1         1
+7011_full       1       1         1
+
+
+attr(,"class")
+[1] "overlap"</code></pre>
+</div>
+</div>
 
 
 </section>
