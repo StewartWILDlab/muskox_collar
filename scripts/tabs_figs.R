@@ -10,6 +10,7 @@ library(tidyverse)
 
 ### set factor levels 
 ids <- c("706", "708", "7010", "7011", "7012", "7013", "7080")
+seas <- c("Summer", "Winter", "Calving")
 
 ### set theme
 theme_proj <- theme_bw() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
@@ -104,3 +105,126 @@ p2 <- musk_overlap %>%
 
 ggpubr::ggarrange(p1, p2, nrow = 2, labels = c("A", "B"))
 ggsave("output/figures/searange_overlap.png", width = 6, height = 8)
+
+
+
+### Coefficient plots
+
+### size models
+
+params <- c("Intercept", "Snow depth", "Season length",
+            "Muskox ID", "Residual")
+mod_coef <- readRDS("output/mod_coef.rds") %>%
+  mutate(Parameter = case_when(
+    term == "(Intercept)" ~ "Intercept",
+    term == "scale(snow_depth)" ~ "Snow depth",
+    term == "scale(seas_length)" ~ "Season length",
+    group == "Id_Number" ~ "Muskox ID",
+    group == "Residual" ~ "Residual"
+  ),
+  Parameter = factor(Parameter, levels = rev(params)),
+  Effect = ifelse(effect == "fixed", "Fixed", "Random"),
+  season = factor(season, levels = seas),
+  label = ifelse(season == "Winter"&Parameter == "Snow depth","*",""))
+mod_coef %>%
+  ggplot(aes(x = Parameter, y = estimate, 
+             colour = Effect, shape = contour)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey") +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high),
+                  position = position_dodge(width = 0.5)) +
+  geom_text(aes(label = label), 
+            position = position_dodge(width = 0.5),
+            vjust = -0.2, colour = "black") +
+  facet_wrap(~season) +
+  coord_flip() +
+  ylab("Estimate") +
+  labs(shape = "Home range contour") +
+  scale_colour_grey(start = 0, end = 0.6) +
+  theme_proj
+ggsave("output/figures/hrsize_mod.png", width = 9, height = 5)
+
+
+### buffer models - no longer using
+
+params2 <- c("Intercept", "Home range buffer",
+            "Muskox ID", "Year", "Residual")
+mod_coef2 <- readRDS("output/mod_coef2.rds") %>%
+  mutate(Parameter = case_when(
+    term == "(Intercept)" ~ "Intercept",
+    term == "groupbuffer" ~ "Home range buffer",
+    group == "Id_Number" ~ "Muskox ID",
+    group == "year_min:Id_Number" ~ "Year",
+    group == "Residual" ~ "Residual"
+  ),
+  Parameter = factor(Parameter, levels = rev(params2)),
+  Effect = ifelse(effect == "fixed", "Fixed", "Random"),
+  season_group = ifelse(season == "Summer", 
+                        "Proportion \ngrassland/shrubland",
+                        "Snow depth"),
+  season = factor(season, levels = seas),
+  label = ifelse(Parameter == "Home range buffer","*","")) %>%
+  group_by(season) %>%
+  mutate(
+    buffer_cat = case_when(
+      contour == min(contour) ~ "small",
+      contour == max(contour) ~ "large",
+      TRUE ~ "medium"),
+    buffer_cat = factor(buffer_cat, levels = c("small", "medium", "large"))
+  )
+
+mod_coef2 %>%
+  filter(season == "Summer") %>%
+  ggplot(aes(x = Parameter, y = estimate, 
+             colour = Effect, shape = buffer_cat)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey") +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high),
+                  position = position_dodge(width = 0.5)) +
+  geom_text(aes(label = label), 
+            position = position_dodge(width = 0.5),
+            vjust = -0.2, colour = "black") +
+  coord_flip() +
+  ylab("Estimate") +
+  labs(shape = "Realtive buffer size") +
+  scale_colour_grey(start = 0, end = 0.6) +
+  theme_proj
+ggsave("output/figures/sumbuff_mod.png", width = 5, height = 5)
+
+mod_coef2 %>%
+  filter(season != "Summer") %>%
+  ggplot(aes(x = Parameter, y = estimate, 
+             colour = Effect, shape = buffer_cat)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey") +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high),
+                  position = position_dodge(width = 0.5)) +
+  geom_text(aes(label = label), 
+            position = position_dodge(width = 0.5),
+            vjust = -0.2, colour = "black") +
+  coord_flip() +
+  ylab("Estimate") +
+  facet_wrap(~season, scales = "free_x") +
+  labs(shape = "Realtive buffer size") +
+  scale_colour_grey(start = 0, end = 0.6) +
+  theme_proj
+ggsave("output/figures/elevbuff_mod.png", width = 8, height = 6.5)
+
+
+### home range selection models
+
+params3 <- c("Intercept", "Proportion \ngrassland/shrubland", 
+             "TPI","sd Muskox ID")
+readRDS("output/select_mod_coefs.rds") %>%
+  mutate(Parameter = factor(Parameter, levels = rev(params3)),
+         Season = factor(Season, level = seas)) %>%
+  ggplot(aes(x = Parameter, y = `50%`, 
+             colour = Effect)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey") +
+  geom_pointrange(aes(ymin = `2.5%`, ymax = `97.5%`)) +
+  coord_flip() +
+  ylab("Estimate") +
+  facet_wrap(~Season) +
+  scale_colour_grey(start = 0, end = 0.6) +
+  theme_proj
+ggsave("output/figures/select_mod.png", width = 8, height = 4)
+
+
+

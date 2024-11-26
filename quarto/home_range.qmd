@@ -29,7 +29,8 @@ Before we can estimate home ranges for the collared muskoxen, we need to determi
 #| label: load-data
 
 library(ctmm)
-musk_move <- read.csv(here("data/raw/muskox_data/musk_collar_filt_movebank.csv"))
+# musk_move <- read.csv(here("data/raw/muskox_data/musk_collar_filt_movebank.csv"))
+musk_move <- readRDS(here("data/processed/musk_move.rds"))
 musk_tel <- as.telemetry(musk_move)[c(-2,-4,-5)]
 
 ```

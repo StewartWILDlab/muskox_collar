@@ -93,6 +93,7 @@ For simplicity, let's remove all points following the first two consecutive shor
 #| echo: FALSE
 #| warning: FALSE
 
+xdate_706 <- as.Date("2009-04-14")
 xdate_707 <- as.Date("2008-01-10")
 xdate_709 <- as.Date("2008-03-22")
 xdate_710 <- as.Date("2008-04-10")
@@ -104,7 +105,8 @@ surveydate_709 <- as.Date("2008-04-26")
 surveydate_710 <- as.Date("2008-04-26")
 
 musk_collar_fix <- musk_collar %>%
-  filter(Id_Number!=707|Date<xdate_707,
+  filter(Id_Number!=706|Date<xdate_706,
+         Id_Number!=707|Date<xdate_707,
          Id_Number!=709|Date<xdate_709,
          Id_Number!=710|Date<xdate_710) %>%
   ungroup() %>%
@@ -267,10 +269,10 @@ That seems to do a better job of only removing the most extreme points.
 
 ## Post-deployment Bias
 
-Lastly, we will remove any points collected within 24 hours of collar deployments to remove the immediate effects of capture and handling.
+Lastly, we will attempt to remove the immediate effects of capture and handling. If we plot the first four weeks of each trajectory, we can see that there is a period where each muskox spends some time travelling before it ends up at an area that it stays for the rest of the winter.
 
 ```{r}
-#| label: musk_collar_filt
+#| label: musk_deploy
 #| dependson: "sdl_dd2"
 #| echo: FALSE
 #| warning: FALSE
@@ -278,7 +280,7 @@ Lastly, we will remove any points collected within 24 hours of collar deployment
 deploy <- read_csv(here("data/raw/muskox_data/musk_collar_deployments.csv"), show_col_types = FALSE) %>%
   mutate(datetime = as.POSIXct(str_c(Date, Time, sep = " ")),
          ##create cutoff time 24 hours after deployment
-         date_filter = datetime + 24*60*60,
+         date_filter = datetime + 12*7*24*60*60,
          Id_Number = as.factor(Id_Number))
 
 deploy %>%
@@ -286,20 +288,97 @@ deploy %>%
   rename(collar_deployed = datetime) %>%
   knitr::kable()
 
-musk_collar_filt <- musk_collar_fix %>%
+musk_deploy <- musk_collar_fix %>%
   right_join(sdl_dd2 %>% select(rowid, pTime, pDist, pSpeed),
             by = "rowid") %>%
   left_join(deploy %>%  select(Id_Number, date_filter), 
             by = c("Id_Number")) %>%
-  ## filter out observations within the 24 hour window following deployment
-  filter(datetime > date_filter) %>%
+  filter(datetime < date_filter) %>%
+  group_by(Id_Number) %>%
+  mutate(date_flag = ifelse(datetime == min(datetime),1,0))
+
+lines <- musk_deploy %>%
+  group_by(Id_Number) %>%
+  arrange(datetime) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("LINESTRING")
+
+pal <- leaflet::colorFactor(
+  palette = c('blue', 'red'),
+  domain = c(musk_deploy$date_flag)
+)
+
+musk_deploy %>%
+  leaflet::leaflet() %>%
+  leaflet::addPolylines(data = lines,
+               group = ~Id_Number) %>%
+  leaflet::addCircles(label = ~Id_Number,
+             popup = ~paste(datetime),
+             group = ~Id_Number,
+             color = ~pal(date_flag)) %>%
+  leaflet::addLayersControl(
+    overlayGroups = ~unique(Id_Number),
+    options = leaflet::layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+```{r}
+#| label: musk_collar_filt
+#| dependson: "sdl_dd2"
+#| echo: FALSE
+#| warning: FALSE
+
+post_depolyment_cutoff <- tibble(
+  Id_Number = factor(c(706,707,708,709,710,7010,7011,7012,7013,7080)),
+  post_deploy_date = c(
+    as_datetime("2007-12-03 16:00:00"),
+    as_datetime("2007-12-05 00:00:00"),
+    as_datetime("2009-02-25 16:00:00"),
+    as_datetime("2008-01-19 16:00:00"),
+    as_datetime("2008-01-21 08:00:00"),
+    as_datetime("2009-02-09 00:00:00"),
+    as_datetime("2009-02-08 08:00:00"),
+    as_datetime("2009-02-08 00:00:00"),
+    as_datetime("2009-02-12 00:00:00"),
+    as_datetime("2007-12-04 08:00:00")
+  )
+)
+
+musk_collar_filt <- musk_collar_fix %>%
+  right_join(sdl_dd2 %>% select(rowid, pTime, pDist, pSpeed),
+            by = "rowid") %>%
+  left_join(post_depolyment_cutoff) %>%
+  ## filter out observations within the post deployment window identified from
+  ## the trajectories
+  filter(datetime > post_deploy_date) %>%
   select(Id_Number, PTT, Latitude, Longitude, datetime, year, month,
          pTime, pDist, pSpeed, geometry)
 
 saveRDS(musk_collar_filt, here("data/processed/musk_collar_filt.rds"))
 
+### create Movebank formatted file
+musk_move <- musk_collar_filt %>%
+  arrange(datetime, Id_Number) %>%
+  mutate(event.id = 1:n(),
+         visible = "true",
+         timestamp = as.character(datetime),
+         location.long = Longitude,
+         location.lat = Latitude,
+         sensor.type = "gps",
+         individual.taxon.canonical.name = NA,
+         tag.local.identifier = PTT,
+         individual.local.identifier = Id_Number,
+         study.name = "NWT Muskox") %>%
+  select(event.id, visible, timestamp, , location.long, location.lat,
+         sensor.type, individual.taxon.canonical.name, 
+         tag.local.identifier, individual.local.identifier, study.name) %>%
+  as_data_frame()
+
+saveRDS(musk_move, here("data/processed/musk_move.rds"))
+
 ### convert file to csv for MoveBank  
-musk_collar_filt %>%
-  sf::st_drop_geometry() %>%
-  write_csv(here("data/processed/musk_collar_filt.csv"))
+# musk_collar_filt %>%
+#   sf::st_drop_geometry() %>%
+#   write_csv(here("data/processed/musk_collar_filt.csv"))
 ```

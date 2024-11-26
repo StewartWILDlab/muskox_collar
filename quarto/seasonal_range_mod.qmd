@@ -93,19 +93,45 @@ musk_wint_sum <- musk_wint %>%
   group_by(range_id, range) %>%
   summarise(snow_depth = mean(value)) %>%
   left_join(musk_seascontwint %>%
-              select(range_id, range, year_min, seas_length, area, Id_Number)) 
+              select(range_id, range, year_min, seas_length, area, Id_Number))
+saveRDS(musk_wint_sum, here("output/musk_wint_sum.rds"))
 
 musk_wint_sum %>%
-  ggplot(aes(x = snow_depth, y = log(area), colour = Id_Number)) +
+  ggplot(aes(x = snow_depth, y = area, colour = Id_Number)) +
   geom_point(size = 3) +
+  scale_y_log10() +
   facet_wrap(~range, scales = "free")
 
-wint_home_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+wint_home_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number,
                  data = musk_wint_sum %>% filter(range == "home"))
 summary(wint_home_mod)
+MuMIn::r.squaredGLMM(wint_home_mod)
+
 wint_core_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
                  data = musk_wint_sum %>% filter(range == "core"))
 summary(wint_core_mod)
+MuMIn::r.squaredGLMM(wint_core_mod)
+
+
+# set.seed(5)
+# wint_home_brms <- brms::brm(log(area)~scale(snow_depth) + (1|Id_Number), 
+#                  data = musk_wint_sum %>% filter(range == "home"),
+#                  family = "gaussian",
+#                  chains = 3,
+#                  cores = 3,
+#                  iter = 4000,
+#                  control = list(adapt_delta = 0.99))
+# summary(wint_home_brms)
+# set.seed(5)
+# wint_core_brms <- brms::brm(log(area)~scale(snow_depth) + (1|Id_Number), 
+#                  data = musk_wint_sum %>% filter(range == "core"),
+#                  family = "gaussian",
+#                  chains = 3,
+#                  cores = 3,
+#                  iter = 4000,
+#                  control = list(adapt_delta = 0.99))
+# summary(wint_core_brms)
+
 ```
 
 Clearly, there is a negative relationship between snow depth and winter range size: as snow depth increases, the size of winter home ranges tends to decrease. In addition, each muskox with multiple years of data had a smaller winter home range in the year with deeper snow.
@@ -172,10 +198,12 @@ musk_calv_sum %>%
   geom_point(size = 3) +
   facet_wrap(~range, scales = "free")
 
-calv_home_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+calv_home_mod <- lme4::lmer(log(area)~scale(snow_depth) + (1|Id_Number), 
                  data = musk_calv_sum %>% filter(range == "home"))
 summary(calv_home_mod)
-calv_core_mod <- nlme::lme(log(area)~scale(snow_depth), random=~1|Id_Number, 
+MuMIn::r.squaredGLMM(calv_home_mod)
+
+calv_core_mod <- lme4::lmer(log(area)~scale(snow_depth)+(1|Id_Number), 
                  data = musk_calv_sum %>% filter(range == "core"))
 summary(calv_core_mod)
 
@@ -281,6 +309,45 @@ sum_core_length_mod <- nlme::lme(log(area)~scale(seas_length),
 summary(sum_core_length_mod)
 ```
 
+```{r}
+#| label: mod_coef
+#| echo: FALSE
+confintz <- function(mod, seas, cont){
+  conf_list <- nlme::intervals(mod) 
+  conf_tidy <- broom.mixed::tidy(mod, conf.int = TRUE) %>%
+    select(effect, group, term, estimate, conf.low, conf.high) %>%
+    mutate(conf.low = ifelse(term == "sd_Observation",
+                             conf_list$sigma["lower"],
+                             conf.low),
+           conf.high = ifelse(term == "sd_Observation",
+                             conf_list$sigma["upper"],
+                             conf.high),
+           season = seas,
+           contour = cont)
+}
+confintz2 <- function(mod, seas, cont){
+  confs <- confint(mod) %>%
+    as_tibble() %>%
+    rename(conf.low = `2.5 %`,
+           conf.high = `97.5 %`) %>%
+    mutate(term = c("sd__(Intercept)", "sd__Observation",
+                    "(Intercept)", "scale(snow_depth)")) 
+  conf_tidy <- broom::tidy(mod) %>%
+    mutate(season = seas,
+           contour = cont) %>%
+    left_join(confs) %>%
+    select(effect, group, term, estimate, conf.low, conf.high, season, contour)
+}
+mod_coef <- confintz(wint_home_mod, "Winter", "95%") %>%
+  bind_rows(confintz(wint_core_mod, "Winter", "50%")) %>%
+  bind_rows(confintz(sum_home_length_mod, "Summer", "95%")) %>%
+  bind_rows(confintz(sum_core_length_mod, "Summer", "50%")) %>%
+  bind_rows(confintz2(calv_home_mod, "Calving", "95%")) %>%
+  bind_rows(confintz2(calv_core_mod, "Calving", "50%"))
+
+saveRDS(mod_coef, here("output/mod_coef.rds"))
+```
+
 There is no significant relationship. If anything, there is a slight negative trend with season length. In fact, as we observed previously, summer home ranges are fairly consistent in size within individuals despite differences in season length across years (see 7011, 7012, 7013, and 708 in graph above), meaning our previous finding of the availability of foraging patches is probably more important.
 
 # Home Range Extent Models
@@ -299,10 +366,10 @@ We will use a buffer of 7 km to start. This buffer represents the average distan
 #| echo: false
 
 lc_2010_crop <- terra::rast(here("data/processed/lc_2010_crop.tif"))
-lcc_func3 <- function(id){
+lcc_func3 <- function(id, buff){
   points <- musk_seascont %>%
     filter(range_id == !!id, range == "home") %>%
-    st_buffer(7000)  %>%
+    st_buffer(buff)  %>%
     st_difference(musk_seascont %>%
                     filter(range_id == !!id, range == "home")) %>%
     mutate(group = "buffer") %>%
@@ -316,13 +383,16 @@ lcc_func3 <- function(id){
                     lc_2010_crop2, field = "group", touches = TRUE)
   ct <- crosstab(c(zones, lc_2010_crop2)) %>%
     as_tibble() %>%
-    mutate(range_id = !!id)
+    mutate(range_id = !!id,
+           buffer = buff)
 }
 
 musk_sum_buf <- musk_seascont %>%
   filter(season == "Summer", range == "home") %>%
   pull(range_id) %>%
-  map(function(.x){lcc_func3(.x)}) %>%
+  map(function(.x){bind_rows(lcc_func3(.x, 7000),
+                             lcc_func3(.x, 3500),
+                             lcc_func3(.x, 14000))}) %>%
   list_rbind() 
 ```
 
@@ -334,21 +404,35 @@ musk_sum_sum3 <- musk_sum_buf %>%
   mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
   # ### remove water land cover from calculation of total land cover
   # filter(Canada2010 != 18) %>%
-  group_by(range_id, group) %>%
+  group_by(range_id, group, buffer) %>%
   summarise(total = sum(n),
             for_tot = sum(n*for_lc),
             for_per = for_tot/total) %>%
   left_join(musk_seascont %>%
               filter(range == "home") %>%
-              select(range_id, year_min, seas_length, area, Id_Number)) 
+              select(range_id, year_min, seas_length, area, Id_Number)) %>%
+  mutate(group = factor(group, levels = c("home range", "buffer")))
 
 musk_sum_sum3 %>%
-  ggplot(aes(x = group, y = for_per)) +
+  filter(buffer == 7000|group!="home range") %>%
+  mutate(group2 = str_c(buffer/1000," km ",group),
+         group2 = ifelse(group == "home range",group,group2),
+         group2 = factor(group2, 
+                         levels = c("home range","3.5 km buffer",
+                                    "7 km buffer", "14 km buffer"))) %>%
+  ggplot(aes(x = group2, y = for_per)) +
   geom_boxplot() 
 
-sum_mod <- nlme::lme(for_per~group, random=~1|Id_Number/year_min, 
-                 data = musk_sum_sum3)
-summary(sum_mod)
+sum_mod1 <- lme4::glmer(cbind(for_tot, total-for_tot)~ group + 
+                         (1|Id_Number/year_min), family = "binomial",
+                       data = musk_sum_sum3 %>% filter(buffer == 7000))
+sum_mod2 <- lme4::glmer(cbind(for_tot, total-for_tot)~ group + 
+                         (1|Id_Number/year_min), family = "binomial",
+                       data = musk_sum_sum3 %>% filter(buffer == 7000/2))
+sum_mod3 <- lme4::glmer(cbind(for_tot, total-for_tot)~ group + 
+                         (1|Id_Number/year_min), family = "binomial",
+                       data = musk_sum_sum3 %>% filter(buffer == 7000*2))
+summary(sum_mod1)
 ```
 
 This result agrees with our hypothesis; the percent cover of foraging areas inside the home range is nearly double the percent cover in the immediate area surrounding the home range. This suggests that forage availability may limit muskox. Using smaller buffers of 2km and 5 km produced the same result. Given that many summer home ranges are bordered by lakes, the percent cover of lakes in the surrounding area could be responsible for some differences in forage cover, but even if we remove lakes from the calculation (not shown here), we still get a significant difference.
@@ -520,10 +604,10 @@ Perhaps the snow cover data is too coarse resolution for this analysis. Some of 
 #| dependson: "musk_snow"
 
 mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
-elev_func <- function(id, d){
+elev_func <- function(id, buff){
   points <- musk_seascont %>%
     filter(range_id == !!id, range == "home") %>%
-    st_buffer(d) %>%
+    st_buffer(buff) %>%
     st_difference(musk_seascont %>%
                     filter(range_id == !!id, range == "home")) %>%
     mutate(group = "buffer") %>%
@@ -536,7 +620,8 @@ elev_func <- function(id, d){
                        terra::vect(),
                      mrdtm_crop2, field = "group", touches = TRUE)
   zonal(mrdtm_crop2, zones, "mean", wide = FALSE, na.rm = TRUE) %>%
-    mutate(range_id = !!id) %>%
+    mutate(range_id = !!id, 
+           buffer = buff) %>%
     select(-layer)
 }
 
@@ -544,12 +629,15 @@ elev_func <- function(id, d){
 musk_elev <- musk_seascont %>%
   filter(season == "Winter", range == "home", seas_length>115) %>%
   pull(range_id) %>%
-  map(function(.x){elev_func(.x, dist)}) %>%
+  map(function(.x){bind_rows(elev_func(.x, dist),
+                             elev_func(.x, dist/2),
+                             elev_func(.x, dist*2))}) %>%
   list_rbind() %>%
   left_join(musk_seascont %>%
               filter(range == "home") %>%
               st_drop_geometry() %>%
-              select(range_id, Id_Number, year_min))
+              select(range_id, Id_Number, year_min)) %>%
+  mutate(group = factor(group, levels = c("home range", "buffer")))
 ```
 
 ```{r}
@@ -559,11 +647,12 @@ musk_elev <- musk_seascont %>%
 musk_elev %>%
   ggplot(aes(x = group, y = value, group = interaction(Id_Number, year_min),
              colour = interaction(Id_Number, year_min))) +
-  geom_line() 
+  facet_wrap(~round(buffer/1000,1)) +
+  geom_line()  
 
 elev_mod <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
-                 data = musk_elev)
-summary(elev_mod)
+                 data = musk_elev %>% filter(buffer == dist))
+summary(elev_mod1)
 ```
 
 Home range are on average higher elevation than the adjacent land, though this difference in elevation is small, around 24 m on average. However, this difference appears to increase as you increase the buffer size, going to 31 m when the buffer size is doubled and 51 m when the buffer size is quadrupled. It's also worth noting that there is a positive increase in elevation in all but two instances and the largest increases happen at higher elevations. Given previous discussions, there may be two main areas that muskoxen go to during the winter: steep cliffs at high elevations and lake shores at lower elevations.
@@ -634,12 +723,15 @@ mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
 musk_elev_calv <- musk_seascont %>%
   filter(season == "Calving", range == "home") %>%
   pull(range_id) %>%
-  map(function(.x){elev_func(.x, dist_calv/2)}) %>%
+  map(function(.x){bind_rows(elev_func(.x, dist_calv),
+                             elev_func(.x, dist_calv/2),
+                             elev_func(.x, dist_calv*2))}) %>%
   list_rbind() %>%
   left_join(musk_seascont %>%
               filter(range == "home") %>%
               st_drop_geometry() %>%
-              select(range_id, Id_Number, year_min))
+              select(range_id, Id_Number, year_min))%>%
+  mutate(group = factor(group, levels = c("home range", "buffer")))
 ```
 
 ```{r}
@@ -649,11 +741,372 @@ musk_elev_calv <- musk_seascont %>%
 musk_elev_calv %>%
   ggplot(aes(x = group, y = value, group = interaction(Id_Number, year_min),
              colour = interaction(Id_Number, year_min))) +
-  geom_line() 
+  geom_line() +
+  facet_wrap(~round(buffer/1000,1))
 
-elev_mod2 <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
-                 data = musk_elev_calv)
-summary(elev_mod2)
+celev_mod <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
+                 data = musk_elev_calv %>% filter(buffer == dist_calv))
+
+summary(celev_mod)
 ```
 
 The same relationship with elevation appears to hold for the calving areas as well, suggesting again that relief from deep snow may be the most important thing in the snowy months. The difference is not as large which likely reflects that fact that calving ranges tend to only cover a portion of the total winter range. Again, the difference in elevations increases with larger buffers.
+
+```{r}
+#| label: buff_mods
+#| echo: FALSE
+#| eval: FALSE
+
+confintz3 <- function(mod, seas, buff){
+  confs <- confint(mod) %>%
+    as_tibble() %>%
+    rename(conf.low = `2.5 %`,
+           conf.high = `97.5 %`) %>%
+    mutate(term = c("sd__(Intercept)","sd__(Intercept)", "sd__Observation",
+                    "(Intercept)", "grouphome range"),
+           group = c("year_min:Id_Number", "Id_Number", "Residual", NA, NA)) 
+  conf_tidy <- broom::tidy(mod) %>%
+    mutate(season = seas,
+           contour = buff) %>%
+    left_join(confs) %>%
+    select(effect, group, term, estimate, conf.low, conf.high, season, contour)
+}
+confintz4 <- function(mod, seas, cont){
+  confs <- confint(mod) %>%
+    as_tibble() %>%
+    rename(conf.low = `2.5 %`,
+           conf.high = `97.5 %`) %>%
+    mutate(term = c("sd__(Intercept)","sd__(Intercept)",
+                    "(Intercept)", "grouphome range"),
+           group = c("year_min:Id_Number", "Id_Number", NA, NA)) 
+  conf_tidy <- broom::tidy(mod) %>%
+    mutate(season = seas,
+           contour = buff) %>%
+    left_join(confs) %>%
+    select(effect, group, term, estimate, conf.low, conf.high, season, contour)
+}
+
+### redoing the models in lme4 to get confidence intervals
+
+elev_mod1 <- lme4::lmer(value~group + (1|Id_Number/year_min), 
+                 data = musk_elev %>% filter(buffer == dist))
+elev_mod2 <- lme4::lmer(value~group + (1|Id_Number/year_min), 
+                 data = musk_elev %>% filter(buffer == dist/2))
+elev_mod3 <- lme4::lmer(value~group + (1|Id_Number/year_min), 
+                 data = musk_elev %>% filter(buffer == dist*2))
+
+celev_mod1 <- lme4::lmer(value~group + (1|Id_Number/year_min), 
+                 data = musk_elev_calv %>% filter(buffer == dist_calv))
+celev_mod2 <- lme4::lmer(value~group + (1|Id_Number/year_min), 
+                 data = musk_elev_calv %>% filter(buffer == dist_calv/2))
+celev_mod3 <- lme4::lmer(value~group + (1|Id_Number/year_min), 
+                 data = musk_elev_calv %>% filter(buffer == dist_calv*2))
+
+
+mod_coef2 <- confintz3(elev_mod1, "Winter", dist) %>%
+  bind_rows(confintz3(elev_mod2, "Winter", dist/2)) %>%
+  bind_rows(confintz3(elev_mod3, "Winter", dist*2)) %>%  
+  bind_rows(confintz4(sum_mod1, "Summer", 7000)) %>%
+  bind_rows(confintz4(sum_mod2, "Summer", 7000/2)) %>%
+  bind_rows(confintz4(sum_mod3, "Summer", 7000*2)) %>%
+  bind_rows(confintz3(celev_mod1, "Calving", dist_calv)) %>%
+  bind_rows(confintz3(celev_mod2, "Calving", dist_calv/2)) %>%
+  bind_rows(confintz3(celev_mod3, "Calving", dist_calv*2))  
+
+saveRDS(mod_coef2, here("output/mod_coef2.rds"))
+
+```
+
+# Home Range Selection Models
+
+Instead of comparing the home range to the adjacent landscape, let's compare the home ranges to random locations within the study area with the same shape.
+
+Let's start by generating random points to move the centers of each home range. We'll restrict these random points to the minimum convex polygon surrounding all telemetry locations. We'll also ensure that home ranges do not overlap large water bodies by more than 10% (a similar threshold for real home ranges).
+
+```{r}
+#| label: study_area
+#| dependson: "load-data"
+
+study_area <- st_convex_hull(st_union(musk_collar_filt$geometry))
+
+hr_shift <- function(hr, seed){
+  lc_2010_crop <- terra::rast(here("data/processed/lc_2010_crop.tif"))
+  set.seed(seed)
+  ### repeat for 10 trials until the proportion of lakes is not too high
+  for (i in 1:10){
+    point <- st_sample(study_area, size = 1, type = "random") %>%
+      st_transform(st_crs(hr))
+    diff = point - st_centroid(hr)
+    poly <- (hr + diff) %>%
+      st_set_crs(st_crs(hr))
+    poly2 <- poly %>%
+      sf::st_transform(terra::crs(lc_2010_crop))
+    lc_2010_crop2 <- terra::crop(lc_2010_crop, poly2)
+    zones <- rasterize(poly2 %>%
+                        terra::vect(),
+                    lc_2010_crop2, touches = TRUE)
+    ct <- crosstab(c(zones, lc_2010_crop2)) %>%
+      as_tibble() %>%
+      mutate(water = ifelse(Canada2010==18,1,0)) %>%
+      summarise(total = sum(n),
+                wat_tot = sum(n*water),
+                wat_per = wat_tot/total) %>%
+      pull(wat_per)
+    if(ct<=0.1){
+      return(poly)
+    }
+  }
+}
+
+musk_pseudohr <- musk_seascont %>%
+  filter(range == "home") %>%
+  mutate(seed = 1:n()) %>%
+  rowwise() %>%
+  mutate(new_geometry = hr_shift(geometry, seed))
+    
+```
+
+## Summer Model
+
+Let's look at the proportion of forage land cover again. This time, we will use a logistic model to compare used vs available home ranges (real vs. pseudo) to see if there is a significant difference. We will use a random effect of muskox ID for the slope term, as we do not expect the intercepts to vary across individuals because they have the same proportion of success and failures
+
+```{r}
+#| label: sum_pseudo
+#| dependson: "study_area"
+#| echo: FALSE
+
+lc_2010_crop <- terra::rast(here("data/processed/lc_2010_crop.tif"))
+lcc_func4 <- function(id){
+  poly <- musk_pseudohr %>%
+    filter(range_id == !!id) %>%
+    mutate(
+      geometry = sf::st_transform(geometry,terra::crs(lc_2010_crop)),
+      new_geometry = sf::st_transform(new_geometry,terra::crs(lc_2010_crop)))
+  lc_2010_crop1 <- terra::crop(lc_2010_crop, poly$geometry)
+  lc_2010_crop2 <- terra::crop(lc_2010_crop, poly$new_geometry)
+  zones1 <- rasterize(poly$geometry %>%
+                        terra::vect(),
+                    lc_2010_crop1, touches = TRUE)
+  zones2 <- rasterize(poly$new_geometry %>%
+                        terra::vect(),
+                    lc_2010_crop2, touches = TRUE)
+  ct1 <- crosstab(c(zones1, lc_2010_crop1)) %>%
+    as_tibble() %>%
+    mutate(range_id = !!id,
+           group = "true")
+  ct2 <- crosstab(c(zones2, lc_2010_crop2)) %>%
+    as_tibble() %>%
+    mutate(range_id = !!id,
+           group = "pseudo")
+  ct <- bind_rows(ct1, ct2)
+}
+
+sum_pseudo <- musk_pseudohr %>%
+  filter(season == "Summer") %>%
+  pull(range_id) %>%
+  map(function(.x){bind_rows(lcc_func4(.x))}) %>%
+  list_rbind() 
+
+```
+
+```{r}
+#| label: sum_pseudo_mod
+#| dependson: "sum_pseudo"
+
+musk_sum_lc <- sum_pseudo %>%
+  mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
+  group_by(range_id, group) %>%
+  summarise(total = sum(n),
+            for_tot = sum(n*for_lc),
+            for_per = for_tot/total) %>%
+  left_join(musk_pseudohr %>%
+              select(range_id, year_min, area, Id_Number)) %>%
+  mutate(true_range = ifelse(group == "true",1,0)) 
+saveRDS(musk_sum_lc, here("output/musk_sum_lc.rds"))
+
+
+musk_sum_lc %>%
+  ggplot(aes(x = group, y = for_per)) +
+  geom_boxplot() 
+
+
+set_seed(5)
+sum_pseudo_brm <- brms::brm(true_range ~ scale(for_per) + 
+                         (1|Id_Number), family = "bernoulli",
+                       data = musk_sum_lc,
+                 chains = 3,
+                 cores = 3,
+                 iter = 10000,
+                 control = list(adapt_delta=0.9))
+
+summary(sum_pseudo_brm)
+
+```
+
+It looks like, as with the buffer approach, home ranges are selected for their proportion of foraging area. We needed to use a Bayesian approach though, because the lme4 models were having a difficult time estimating the variance of the random effect, possibly a result of the small sample size.
+
+## Winter Model
+
+```{r}
+#| label: wint_pseudo
+#| dependson: c("study_area" "musk_snow")
+#| echo: FALSE
+
+mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
+mrdtm_agg <- terra::aggregate(mrdtm_crop, fact = 5)
+tpi_crop <- spatialEco::tpi(mrdtm_agg, scale = 3000, win = "circle")
+
+tpi_func <- function(id, layer){
+  poly <- musk_pseudohr %>%
+    filter(range_id == !!id) %>%
+    mutate(
+      geometry = sf::st_transform(geometry,terra::crs(layer)),
+      new_geometry = sf::st_transform(new_geometry,terra::crs(layer)))
+  tpi_crop1 <- terra::crop(layer, poly$geometry)
+  tpi_crop2 <- terra::crop(layer, poly$new_geometry)
+  zones1 <- rasterize(poly$geometry %>%
+                        terra::vect(),
+                    tpi_crop1, touches = TRUE)
+  zones2 <- rasterize(poly$new_geometry %>%
+                        terra::vect(),
+                    tpi_crop2, touches = TRUE)
+  z1 <- zonal(tpi_crop1, zones1, "mean", wide = FALSE, na.rm = TRUE) %>%
+    mutate(range_id = !!id, 
+           group = "true") %>%
+    select(-layer)
+  z2 <- zonal(tpi_crop2, zones2, "mean", wide = FALSE, na.rm = TRUE) %>%
+    mutate(range_id = !!id, 
+           group = "pseudo") %>%
+    select(-layer)
+  bind_rows(z1,z2)
+}
+
+musk_wint_tpi <- musk_pseudohr %>%
+  filter(season == "Winter") %>%
+  pull(range_id) %>%
+  map(function(.x){tpi_func(.x, tpi_crop)}) %>%
+  list_rbind() %>%
+  left_join(musk_pseudohr %>%
+              st_drop_geometry() %>%
+              select(range_id, Id_Number, year_min)) %>%
+  mutate(true_range = ifelse(group == "true",1,0))
+saveRDS(musk_wint_tpi, here("output/musk_wint_tpi.rds"))
+
+
+```
+
+```{r}
+#| label: wint_pseudo_mod
+#| dependson: "wint_pseudo"
+
+musk_wint_tpi %>%
+  ggplot(aes(x = group, y = value)) +
+  geom_boxplot() 
+
+
+
+set_seed(5)
+wint_pseudo_brm <- brms::brm(true_range ~ scale(value) + 
+                         (1|Id_Number), family = "bernoulli",
+                       data = musk_wint_tpi,
+                 chains = 3,
+                 cores = 3,
+                 iter = 10000,
+                 control = list(adapt_delta =0.9))
+
+summary(wint_pseudo_brm)
+```
+
+Home ranges are associated with higher topographic position indices indicating winter home ranges are more often elevated relative to their surroundings. Let's plot the winter home ranges on the TPI raster to better visualize it:
+
+```{r}
+musk_pseudohr %>%
+  filter(season == "Winter") %>%
+  select(-new_geometry) %>%
+  st_transform(4326) %>%
+  leaflet::leaflet() %>%
+  leaflet::addPolygons() %>%
+  leaflet::addRasterImage(tpi_crop)
+```
+
+## Calving Model
+
+```{r}
+#| label: calv_pseudo
+#| dependson: "study_area"
+#| echo: FALSE
+
+mrdtm_crop <- terra::rast(here("data/processed/mrdtm_crop.tif"))
+mrdtm_agg <- terra::aggregate(mrdtm_crop, fact = 5)
+tpi_crop <- spatialEco::tpi(mrdtm_agg, scale = 3000, win = "circle")
+
+musk_calv_tpi <- musk_pseudohr %>%
+  filter(season == "Calving") %>%
+  pull(range_id) %>%
+  map(function(.x){tpi_func(.x, tpi_crop)}) %>%
+  list_rbind() %>%
+  left_join(musk_pseudohr %>%
+              st_drop_geometry() %>%
+              select(range_id, Id_Number, year_min)) %>%
+  mutate(true_range = ifelse(group == "true",1,0))
+saveRDS(musk_calv_tpi, here("output/musk_calv_tpi.rds"))
+```
+
+```{r}
+#| label: calv_pseudo_mod
+#| dependson: "calv_pseudo"
+
+musk_calv_tpi %>%
+  ggplot(aes(x = group, y = value)) +
+  geom_boxplot() 
+
+calv_pseudo_mod <- lme4::glmer(true_range ~ scale(value) + 
+                         (1|Id_Number), family = "binomial",
+                       data = musk_calv_tpi)
+summary(calv_pseudo_mod)
+
+set_seed(5)
+calv_pseudo_brm <- brms::brm(true_range ~ scale(value) + 
+                         (1|Id_Number), family = "bernoulli",
+                       data = musk_calv_tpi,
+                 chains = 3,
+                 cores = 3,
+                 iter = 10000,
+                 control = list(adapt_delta =0.9))
+
+summary(calv_pseudo_brm)
+```
+
+```{r}
+#| label: select_mod_coefs
+#| echo: FALSE
+#| eval: FALSE
+
+sum_effects <- sum_pseudo_brm %>%
+  tidybayes::spread_draws(`Intercept`, `b_scalefor_per`, 
+                          `sd_Id_Number__Intercept`) %>%
+  tidybayes::summarise_draws(~quantile(.x, probs = c(0.025,0.5,0.975))) %>%
+  mutate(Parameter = c("Intercept", "Proportion \ngrassland/shrubland", 
+                       "sd Muskox ID"),
+         Effect = c("Fixed", "Fixed", "Random"),
+         Season = "Summer")
+wint_effects <- wint_pseudo_brm %>%
+  tidybayes::spread_draws(`Intercept`, `b_scalevalue`, 
+                          `sd_Id_Number__Intercept`) %>%
+  tidybayes::summarise_draws(~quantile(.x, probs = c(0.025,0.5,0.975))) %>%
+  mutate(Parameter = c("Intercept", "TPI", "sd Muskox ID"),
+         Effect = c("Fixed", "Fixed", "Random"),
+         Season = "Winter")
+calv_effects <- calv_pseudo_brm %>%
+  tidybayes::spread_draws(`Intercept`, `b_scalevalue`, 
+                          `sd_Id_Number__Intercept`) %>%
+  tidybayes::summarise_draws(~quantile(.x, probs = c(0.025,0.5,0.975))) %>%
+  mutate(Parameter = c("Intercept", "TPI", "sd Muskox ID"),
+         Effect = c("Fixed", "Fixed", "Random"),
+         Season = "Calving")
+
+select_mod_coefs <- bind_rows(sum_effects, wint_effects, calv_effects)
+
+saveRDS(select_mod_coefs, here("output/select_mod_coefs.rds"))
+
+```

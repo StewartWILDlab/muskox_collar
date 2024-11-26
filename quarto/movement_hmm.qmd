@@ -1,0 +1,168 @@
+---
+title: "Hidden Markov Movement Model"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+  error: false
+---
+
+In this document, we will use hidden markov models to distinguish different movement behaviours of muskoxen based on step lengths and turn angles throughout the year. We will use the **momentuHMM** package to accomplish this.
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(momentuHMM)
+library(here)
+library(sf)
+library(tidyverse) 
+source(here::here("scripts/functions/hmm_functions.R"))
+```
+
+```{r}
+#| label: load-data
+#| echo: false
+
+musk_collar_filt <- readRDS(here::here("data/processed/musk_collar_filt.rds"))
+snowdepth_locs <- readRDS(here::here("data/processed/snowdepth_locs.rds")) %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(Id_Number, Latitude, Longitude, datetime, snow_depth)
+```
+
+The muskox movement data are collected at 8 h intervals but occasionally there a gaps exceeding 8 hours. The HMM can deal with short gaps but large gaps can lead to increases in model uncertainty. To deal with this, we will split all gaps exceeding 16 hours (i.e. more than one missing data point) into separate bursts. We also separate bursts by season, with summer including snow-free bursts and winter including snow covered bursts. To be conservative, we will define seasons using a cut-off of 0.01 m snow depth. We'll define the start of winter as the first three successive days with snow depth \>=0.01 m and the end of winter as the first three successive days with snow depth \<=0.01 m.
+
+```{r}
+#| label: prep_data
+#| dependson: "load-data"
+
+musk_hmm_data <- musk_collar_filt %>%
+  left_join(snowdepth_locs) %>%
+  group_by(year, Id_Number) %>%
+  mutate(season = season_delineation(datetime, snow_depth, 0.1),
+         year_min = minimum_year_season(year,datetime,season)) %>%
+  group_by(Id_Number, year_min, season) %>%
+  mutate(burst = burst_delineation(pTime, gap_threshold = 48),
+         burst_id = str_c(Id_Number,"_",year_min,"_",season,"_",burst)) %>%
+  ungroup()
+
+burst_plot(musk_hmm_data, id = "burst_id", length_threshold = 84)
+
+### filter out short bursts, i.e. less than 2 weeks worth of data (14days x 3 obs/day = 42 obs)
+musk_hmm_data_filter <- burst_filter(musk_hmm_data, id = "burst_id", threshold = 84)
+
+```
+
+Now that we have our individual bursts, we will fill short gaps from each burst using the crawlWrap function, which interpolates locations for each gap.
+
+```{r}
+#| label: fill_gaps
+#| dependson: "prep_data"
+
+
+prior <- function(p){
+  dnorm(p[1], 4, 1, log = TRUE) +
+    dnorm(p[2], -0.5, 1, log = TRUE)
+}
+
+## To-do: find a way to fit one crawl model across all individuals
+musk_hmm_data_crawl_winter <- musk_hmm_data_filter %>%
+  ungroup() %>%
+  mutate(ID = burst_id) %>%
+  ### coordinates need to be UTM for the crawlWrap function
+  sf::st_transform(32609) %>%
+  filter(season == "winter", 
+         burst_id != "7010_2008_winter_1") %>%
+  momentuHMM::crawlWrap(Time.name = "datetime", 
+                        timeStep = "8 hours", 
+                        attempts = 100,
+                        retryFits = 10,
+                        theta = c(4,-0.5),
+                        prior = prior,
+                        retrySD = 2)
+
+
+musk_hmm_data_formatted <- prepData(musk_hmm_data_crawl_winter, 
+                                    covNames = c("snow_depth",
+                                                 "Id_Number"))
+
+m1 <- fitHMM(musk_hmm_data_formatted, 
+             nbStates = 2,
+             # nSims = 3,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = list(step=c(100,1000,100,1000,0.1,0.1),
+                         angle=c(0.2,0.8)),
+             # estAngleMean=list(angle=TRUE),
+             # formula = ~snow_depth,
+             # mixtures = 3,
+             # formulaPi = ~Id_Number, 
+             # retryFits = 3,
+             # retrySD = list(step=c(10,100,10,100,0.1,0.1),
+             #             angle=c(0.2,0.8))
+             )
+
+m1_pars <- getPar(m1)
+
+sims <- MIfitHMM(musk_hmm_data_crawl_winter, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = m1_pars$Par,
+             beta0 = m1_pars$beta,
+             delta0 = m1_pars$delta,
+             fit = FALSE
+             )
+
+m2 <- MIfitHMM(sims, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = m1_pars$Par,
+             beta0 = m1_pars$beta,
+             delta0 = m1_pars$delta
+             )
+
+saveRDS(m2, here("output/musk_hmm_mod_winter.rds"))
+m2 <- readRDS(here("output/musk_hmm_mod_winter.rds"))
+m2
+plot(m2)
+
+
+
+
+# temp <- map(musk_hmm_data_crawl_winter$crwFits,
+#      function(x)tibble(est1 = x$estPar[1], se1 = x$se[1],
+#                        est2 = x$estPar[2], se2 = x$se[2])) %>%
+#    bind_rows() %>%
+#   mutate(burst_id = names(musk_hmm_data_crawl_winter$crwFits))
+# unique(musk_hmm_data_filter$burst_id)[which(!(unique(musk_hmm_data_filter$burst_id)%in%temp$burst_id))]
+# 
+# 
+# lines <- musk_hmm_data_filter %>%
+#   filter(year_min==2008) %>%
+#   group_by(Id_Number) %>%
+#   arrange(datetime) %>%
+#   summarise(do_union = FALSE) %>%
+#   st_cast("LINESTRING")
+# 
+# pal <- leaflet::colorFactor(
+#   palette = c('blue', 'red'),
+#   domain = c(musk_hmm_data_filter$season)
+# )
+# 
+# musk_hmm_data_filter %>%
+#   filter(year_min==2008) %>%
+#   leaflet::leaflet() %>%
+#   leaflet::addPolylines(data = lines,
+#                group = ~Id_Number) %>%
+#   leaflet::addCircles(label = ~Id_Number,
+#              popup = ~paste(datetime),
+#              group = ~Id_Number,
+#              color = ~pal(season)) %>%
+#   leaflet::addLayersControl(
+#     overlayGroups = ~unique(Id_Number),
+#     options = leaflet::layersControlOptions(collapsed = FALSE)
+#   )
+```
