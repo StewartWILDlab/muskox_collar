@@ -10,6 +10,7 @@
 library(tidyverse)
 library(sf)
 library(terra)
+source("scripts/functions/raster_prep_functions.R")
 
 ### Load muskox collar data in Sahtu
 musk_collar <- readRDS("data/processed/musk_collar.rds")
@@ -17,21 +18,28 @@ musk_collar <- readRDS("data/processed/musk_collar.rds")
 ### Load land cover Canada 2010 data
 mrdtm <- terra::rast("data/raw/MRDEM/mrdtm.tif")
 
-### buffer collar data 1km
-buffer <- musk_collar %>%
-  sf::st_transform(terra::crs(mrdtm)) %>%
-  sf::st_buffer(dist = 100000)
+### resize data to make subsequent analyses computationally easier
+mrdtm_crop <- resize_raster_to_gps_points(
+  mrdtm, 
+  musk_collar, 
+  buffer_dist = 100000)
 
-### crop land cover data to collar data buffer
-mrdtm_crop <- terra::crop(mrdtm, buffer)
 
-## now project land cover to same crs as location data for plotting
-mrdtm_proj <- mrdtm_crop %>%
-  terra::project(y = "epsg:4326") %>%
-  terra::crop(musk_collar %>% sf::st_buffer(dist = 10000))
+## now project to UTM Zone 9N crs for future analysis
+mrdtm_proj <- crop_and_reproject_to_gps_points(
+  mrdtm_crop,
+  musk_collar,
+  crs_epsg = 32609,
+  buffer_dist = 10000
+)
+
+### start with a 3 by 3 region around cell of interest, resolution is 30 m so 
+### that equates to a 90 by 90 m box around each point
+mrtri3_proj <- spatialEco::tri(mrdtm_proj, s = 3, exact = FALSE)
 
 writeRaster(mrdtm_crop, "data/processed/mrdtm_crop.tif", overwrite = TRUE)
 writeRaster(mrdtm_proj, "data/processed/mrdtm_proj.tif", overwrite = TRUE)
+writeRaster(mrtri3_proj, "data/processed/mrtri3_proj.tif", overwrite = TRUE)
 
 
 

@@ -399,8 +399,9 @@ pal <- colorFactor(
 )
 
 wms_lc <- "https://datacube.services.geo.ca/ows/landcover"
+wms_lc <-  "https://www.apps.geomatics.gov.nt.ca/arcgis/services/GNWT/InlandWater_LCC/MapServer/WmsServer?"
 
-musk_wint %>%
+m <- musk_wint %>%
   bind_rows(snowdepth_locs %>%
   filter(month < 9&month > 5) %>%
     mutate(season = "Summer")) %>%
@@ -421,10 +422,13 @@ musk_wint %>%
   # addWMSTiles(wms_dtm, layers = "dsm",
   #              options = WMSTileOptions(format = "image/png",
   #                                       transparent = TRUE, version = "1.3.0"))
-  addWMSTiles(wms_lc, layers = "landcover-2010",
-               options = WMSTileOptions(format = "image/png",
-                                        transparent = TRUE, version = "1.3.0"))
-
+  addWMSTiles(wms_lc, layers = 1:24,
+               options = WMSTileOptions(format = "image/png", version = "1.3.0"))
+library(htmlwidgets)
+library(webshot)
+saveWidget(m, "temp.html", selfcontained = FALSE)
+webshot("temp.html", file = "Rplot.png",
+        cliprect = "viewport")
 
 ```
 

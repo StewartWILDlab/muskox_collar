@@ -1,0 +1,293 @@
+---
+title: "Hidden Markov Movement Model"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+  error: false
+---
+
+
+
+
+
+In this document, we will use hidden markov models to distinguish different movement behaviours of muskoxen based on step lengths and turn angles throughout the year. We will use the **momentuHMM** package to accomplish this.
+
+
+
+
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(momentuHMM)
+library(here)
+library(sf)
+library(tidyverse) 
+source(here::here("scripts/functions/hmm_functions.R"))
+```
+
+```{r}
+#| label: load-data
+#| echo: false
+
+musk_collar_filt <- readRDS(here::here("data/processed/musk_collar_filt.rds"))
+snowdepth_locs <- readRDS(here::here("data/processed/snowdepth_locs.rds")) %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(Id_Number, Latitude, Longitude, datetime, snow_depth)
+```
+
+
+
+
+
+The muskox movement data are collected at 8 h intervals but occasionally there a gaps exceeding 8 hours. The HMM can deal with short gaps but large gaps can lead to increases in model uncertainty. To deal with this, we will split all gaps exceeding 16 hours (i.e. more than one missing data point) into separate bursts. We also separate bursts by season, with summer including snow-free bursts and winter including snow covered bursts. To be conservative, we will define seasons using a cut-off of 0.01 m snow depth. We'll define the start of winter as the first three successive days with snow depth \>=0.01 m and the end of winter as the first three successive days with snow depth \<=0.01 m.
+
+
+
+
+
+```{r}
+#| label: prep_data
+#| dependson: "load-data"
+
+musk_hmm_data <- musk_collar_filt %>%
+  left_join(snowdepth_locs) %>%
+  group_by(year, Id_Number) %>%
+  mutate(season = season_delineation(datetime, snow_depth, 0.1),
+         year_min = minimum_year_season(year,datetime,season)) %>%
+  group_by(Id_Number, year_min, season) %>%
+  mutate(burst = burst_delineation(pTime, gap_threshold = 48),
+         burst_id = str_c(Id_Number,"_",year_min,"_",season,"_",burst)) %>%
+  ungroup()
+
+### filter out short bursts, i.e. less than 4 weeks worth of data (28days x 3 obs/day = 84 obs)
+burst_plot(musk_hmm_data, id = "burst_id", length_threshold = 84)
+
+musk_hmm_data_filter <- burst_filter(musk_hmm_data, id = "burst_id", threshold = 84) %>%
+  ungroup() %>%
+  mutate(ID = burst_id) %>%
+  ### coordinates need to be UTM for the crawlWrap function
+  sf::st_transform(32609)
+
+```
+
+
+
+
+
+Now that we have our individual bursts, we will fill short gaps from each burst using the crawlWrap function, which interpolates locations for each gap. We will do this separately for each season. We will also specify a prior to help keep the models within realistic limits. This function will provide an error model for the data that we can use to simulate locations for the missing data.
+
+
+
+
+
+```{r}
+#| label: fill_gaps
+#| dependson: "prep_data"
+
+
+prior_winter <- function(p){
+  dnorm(p[1], 4, 1, log = TRUE) +
+    dnorm(p[2], -0.5, 1, log = TRUE)
+}
+
+prior_summer <- function(p){
+  dnorm(p[1], 6, 1, log = TRUE) +
+    dnorm(p[2], -0.5, 1, log = TRUE)
+}
+
+set.seed(5)
+musk_hmm_data_crawl_winter <- musk_hmm_data_filter %>%
+  filter(season == "winter", 
+         ### removing this burst as it has not been fitting well
+         burst_id != "7010_2008_winter_1") %>%
+  momentuHMM::crawlWrap(Time.name = "datetime", 
+                        timeStep = "8 hours", 
+                        attempts = 100,
+                        retryFits = 10,
+                        theta = c(4,-0.5),
+                        prior = prior_winter,
+                        retrySD = 2)
+saveRDS(musk_hmm_data_crawl_winter, 
+        here("data/processed/musk_hmm_data_crawl_winter.rds"))
+### remove object for now as it is large
+# rm(musk_hmm_data_crawl_winter)
+
+set.seed(5)
+musk_hmm_data_crawl_summer <- musk_hmm_data_filter %>%
+  filter(season == "summer") %>%
+  momentuHMM::crawlWrap(Time.name = "datetime", 
+                        timeStep = "8 hours", 
+                        attempts = 100,
+                        retryFits = 10,
+                        theta = c(6,-0.5),
+                        prior = prior_summer,
+                        retrySD = 2)
+saveRDS(musk_hmm_data_crawl_summer, 
+        here("data/processed/musk_hmm_data_crawl_summer.rds"))
+### remove object for now as it is large
+# rm(musk_hmm_data_crawl_summer)
+
+
+
+musk_hmm_data_formatted <- prepData(musk_hmm_data_crawl_winter, 
+                                    covNames = c("snow_depth",
+                                                 "Id_Number"))
+
+m1 <- fitHMM(musk_hmm_data_formatted, 
+             nbStates = 2,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = list(step=c(100,1000,100,1000,0.1,0.1),
+                         angle=c(0.2,0.8)),
+             # estAngleMean=list(angle=TRUE),
+             # formula = ~snow_depth,
+             # mixtures = 3,
+             # formulaPi = ~Id_Number, 
+             # retryFits = 3,
+             # retrySD = list(step=c(10,100,10,100,0.1,0.1),
+             #             angle=c(0.2,0.8))
+             )
+
+m1_pars <- getPar(m1)
+
+sims <- MIfitHMM(musk_hmm_data_crawl_winter, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = m1_pars$Par,
+             beta0 = m1_pars$beta,
+             delta0 = m1_pars$delta,
+             fit = FALSE
+             )
+
+m2 <- MIfitHMM(sims, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = m1_pars$Par,
+             beta0 = m1_pars$beta,
+             delta0 = m1_pars$delta
+             )
+
+saveRDS(m2, here("output/musk_hmm_mod_winter.rds"))
+m2 <- readRDS(here("output/musk_hmm_mod_winter.rds"))
+m2
+plot(m2)
+
+
+```
+
+
+
+
+
+Now that we have filled the gaps in the bursts, we can fit HMMs. The first step will be to fit a single model to our gap-filled data. We will try to predict 2 states for each season: one for foraging and one for relocating. Previous studies have created a third state that represents resting (i.e. not moving), but the temporal resolution of our data does not allow for the fine scale movement information that would permit this identification.
+
+There is the option to include random effects in these models; however, using a random effect for muskox ID did not lead to a better model fit based on AIC, so it was not included in the final model. There is also the option to include covariates that influence the probabilities of state transitions. I may try using snow depth and day of season to see if they have an infleunce, but for now we will stick with no covariates.
+
+
+
+
+
+```{r}
+#| label: base_models
+#| dependson: "fill_gaps"
+
+musk_hmm_data_formatted_winter <- prepData(musk_hmm_data_crawl_winter)
+musk_hmm_data_formatted_summer <- prepData(musk_hmm_data_crawl_summer)
+
+set.seed(5)
+base_model_winter <- fitHMM(musk_hmm_data_formatted_winter, 
+             nbStates = 2,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = list(step=c(100,1000,100,1000,0.1,0.1),
+                         angle=c(0.2,0.8)),
+             retryFits = 10)
+saveRDS(base_model_winter,here("output/hmm/base_model_winter.rds"))
+base_model_winter <- readRDS(here("output/hmm/base_model_winter.rds"))
+
+set.seed(5)
+base_model_summer <- fitHMM(musk_hmm_data_formatted_summer, 
+             nbStates = 2,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = list(step=c(100,1000,100,1000,0.1,0.1),
+                         angle=c(0.2,0.8)),
+             retryFits = 10)
+saveRDS(base_model_summer,here("output/hmm/base_model_summer.rds"))
+base_model_summer <- readRDS(here("output/hmm/base_model_summer.rds"))
+
+### save the base model parameters to use as initial values for the multiple
+### imputation models
+base_model_params_winter <- getPar(base_model_winter)
+base_model_params_summer <- getPar(base_model_summer)
+
+
+```
+
+
+
+
+
+The next step is run multiple imputations of the HMM using simulated data to fill in the missing location data for each burst. We'll use 100 simulations for each season and pool the estimates together.
+
+
+
+
+
+```{r}
+#| label: MI_models
+#| dependson: "base_models"
+
+sims_summer <- MIfitHMM(musk_hmm_data_crawl_summer, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = base_model_params_summer$Par,
+             beta0 = base_model_params_summer$beta,
+             delta0 = base_model_params_summer$delta,
+             fit = FALSE)
+
+sims_winter <- MIfitHMM(musk_hmm_data_crawl_winter, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = base_model_params_winter$Par,
+             beta0 = base_model_params_winter$beta,
+             delta0 = base_model_params_winter$delta,
+             fit = FALSE)
+
+mi_model_summer <- MIfitHMM(sims_summer, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = base_model_params_summer$Par,
+             beta0 = base_model_params_summer$beta,
+             delta0 = base_model_params_summer$delta)
+saveRDS(mi_model_summer,here("output/hmm/mi_model_summer.rds"))
+mi_model_summer <- readRDS(here("output/hmm/mi_model_summer.rds"))
+
+mi_model_winter <- MIfitHMM(sims_winter, 
+             nbStates = 2,
+             nSims = 100,
+             dist = list(step = "gamma", angle = "vm"),
+             Par0 = base_model_params_winter$Par,
+             beta0 = base_model_params_winter$beta,
+             delta0 = base_model_params_winter$delta)
+saveRDS(mi_model_winter,here("output/hmm/mi_model_winter.rds"))
+mi_model_winter <- readRDS(here("output/hmm/mi_model_winter.rds"))
+
+```
+
+```{r}
+#| label: hmm_states
+#| dependson: "MI_models"
+
+states_summer <- extract_hmm_states(mi_model_summer, musk_hmm_data)
+plot_hmm_states(states_summer)
+
+```
+

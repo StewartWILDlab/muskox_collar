@@ -7,6 +7,7 @@
 ######################################################
 ### Script to produce tables and figures for manuscripts
 library(tidyverse)
+library(ctmm)
 
 ### set factor levels 
 ids <- c("706", "708", "7010", "7011", "7012", "7013", "7080")

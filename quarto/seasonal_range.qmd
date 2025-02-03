@@ -460,4 +460,17 @@ musk_seascontwint <- bind_rows(musk_seascontwint_95, musk_seascontwint_50)
 saveRDS(musk_seascontwint, here("output/musk_seascontwint.rds"))
 ```
 
-## 
+## Seasonal Minimum Convex Polygons
+
+```{r}
+#| label: seasonal_mcp
+#| dependson: "musk_ltraj"
+
+
+musk_season_mcp <- mcp(musk_collar_seas %>%
+  sf::st_transform("+proj=utm +zone=9") %>% 
+    dplyr::select(range_id) %>% 
+    as_Spatial(),
+                percent = 95, unout = "km")
+saveRDS(musk_season_mcp, here("output/musk_season_mcp.rds"))
+```

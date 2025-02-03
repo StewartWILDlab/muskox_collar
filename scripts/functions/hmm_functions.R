@@ -94,3 +94,81 @@ burst_plot <- function(data, id, length_threshold){
     scale_colour_manual(values = c("black", "red")) +
     theme_bw()
 }
+
+### The following two functions were pulled directly from momentuHMM package
+### in order to use the viterbi function on the multiple imputation results
+
+formatmiSum <- function(miSum){
+  miSum$mle <- lapply(miSum$Par$real,function(x) x$est)
+  miSum$mle$beta <- miSum$Par$beta$beta$est
+  miSum$mle[["pi"]] <- miSum$Par$real[["pi"]]$est
+  miSum$mle$delta <- miSum$Par$real$delta$est
+  miSum$mod <- list()
+  if(!is.null(miSum$conditions$recharge)){
+    nbRecovs <- ncol(stats::model.matrix(miSum$conditions$recharge$g0,miSum$g0covs))-1
+    nbG0covs <- ncol(stats::model.matrix(miSum$conditions$recharge$theta,miSum$reCovs))-1
+    miSum$mle$g0 <- c(miSum$Par$beta$g0$est)
+    names(miSum$mle$g0) <- colnames(miSum$Par$beta$g0$est)
+    miSum$mle$theta <- c(miSum$Par$beta$theta$est)
+    names(miSum$mle$theta) <- colnames(miSum$Par$beta$theta$est)
+  } else nbRecovs <- nbG0covs <- 0
+  miSum$mod$estimate <- expandPar(miSum$MIcombine$coefficients,miSum$conditions$optInd,unlist(miSum$conditions$fixPar),miSum$conditions$wparIndex,miSum$conditions$betaCons,miSum$conditions$deltaCons,length(miSum$stateNames),ncol(miSum$covsDelta)-1,miSum$conditions$stationary,nrow(miSum$Par$beta$beta$est)/miSum$conditions$mixtures-1,nbRecovs+nbG0covs,miSum$conditions$mixtures,ncol(miSum$covsPi)-1)
+  miSum$mod$wpar <- miSum$MIcombine$coefficients
+  miSum
+}
+
+expandPar <- function(optPar,optInd,fixPar,wparIndex,betaCons,deltaCons,nbStates,nbCovsDelta,stationary,nbCovs,nbRecovs=0,mixtures=1,nbCovsPi=0){
+  if(length(optInd)){
+    wpar <- numeric(length(fixPar))
+    wpar[-optInd] <- optPar
+    if(length(wparIndex)) wpar[wparIndex] <- fixPar[wparIndex]
+    if(nbStates>1){
+      if(!is.null(betaCons)){
+        foo <- length(wpar)-(nbCovsDelta+1)*(nbStates-1)*(!stationary)*mixtures-ifelse(nbRecovs,nbRecovs+2,0)-(nbCovsPi+1)*(mixtures-1)-((nbCovs+1)*nbStates*(nbStates-1)*mixtures-1):0
+        wpar[foo] <- wpar[foo][betaCons]
+      }
+      if(!is.null(deltaCons)){
+        foo <- length(wpar)-ifelse(nbRecovs,nbRecovs+2,0)-((nbCovsDelta+1)*(nbStates-1)*mixtures-1):0
+        wpar[foo] <- wpar[foo][deltaCons]
+      }
+    }
+  } else {
+    wpar <- optPar
+  }
+  wpar
+}
+
+### function to extract states from fitted MIhmm model
+extract_hmm_states <- function(model, data){
+  mod_formatted <- formatmiSum(model$miSum)
+  class(mod_formatted) <- append("momentuHMM",class(mod_formatted))
+  states <- viterbi(mod_formatted)
+  
+  data_with_states <- data %>%
+    left_join(
+      model$miSum$data %>%
+        as_tibble() %>%
+        mutate(state = states) %>%
+        rename(burst_id = ID) %>%
+        select(burst_id, datetime, state) 
+    )
+  return(data_with_states)
+}
+
+plot_hmm_states <- function(data){
+  lines <- data %>%
+    drop_na(state) %>%
+    group_by(burst_id) %>%
+    arrange(datetime) %>%
+    summarise(do_union = FALSE) %>%
+    st_cast("LINESTRING")
+  
+  plot <- data %>% 
+    drop_na(state) %>%
+    ggplot() +
+    geom_sf(data = lines) +
+    geom_sf(aes(colour = factor(state))) +
+    theme_bw()
+  
+  return(plot)
+}

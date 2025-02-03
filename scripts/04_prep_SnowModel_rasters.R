@@ -10,6 +10,7 @@
 library(tidyverse)
 library(sf)
 library(terra)
+source("scripts/functions/raster_prep_functions.R")
 
 ### Load muskox collar data in Sahtu
 musk_collar <- readRDS("data/processed/musk_collar.rds")
@@ -28,20 +29,41 @@ sm_2011 <- terra::rast("data/raw/SnowModel/SnowModel_snow_depth_2011.nc4",
 sm_2012 <- terra::rast("data/raw/SnowModel/SnowModel_snow_depth_2012.nc4", 
                        drivers="NETCDF")
 
-### buffer collar data 1km
-buffer <- musk_collar %>%
-  sf::st_transform(terra::crs(sm_2008)) %>%
-  sf::st_buffer(dist = 100000)
-
 ### crop snow depth data to collar buffer
-sm_2007_crop <- terra::crop(sm_2007, buffer)
-sm_2008_crop <- terra::crop(sm_2008, buffer)
-sm_2009_crop <- terra::crop(sm_2009, buffer)
-sm_2010_crop <- terra::crop(sm_2010, buffer)
-sm_2011_crop <- terra::crop(sm_2011, buffer)
-sm_2012_crop <- terra::crop(sm_2012, buffer)
+sm_2007_crop <- resize_raster_to_gps_points(
+  sm_2007, 
+  musk_collar, 
+  buffer_dist = 100000)
+sm_2008_crop <- resize_raster_to_gps_points(
+  sm_2008, 
+  musk_collar, 
+  buffer_dist = 100000)
+sm_2009_crop <- resize_raster_to_gps_points(
+  sm_2009, 
+  musk_collar, 
+  buffer_dist = 100000)
+sm_2010_crop <- resize_raster_to_gps_points(
+  sm_2010, 
+  musk_collar, 
+  buffer_dist = 100000)
+sm_2011_crop <- resize_raster_to_gps_points(
+  sm_2011, 
+  musk_collar, 
+  buffer_dist = 100000)
+sm_2012_crop <- resize_raster_to_gps_points(
+  sm_2012, 
+  musk_collar, 
+  buffer_dist = 100000)
 sm_crop <- c(sm_2007_crop, sm_2008_crop, sm_2009_crop, sm_2010_crop,
              sm_2011_crop, sm_2012_crop)
+
+## now project to UTM Zone 9N crs for future analysis
+sm_proj <- crop_and_reproject_to_gps_points(
+  sm_crop,
+  musk_collar,
+  crs_epsg = 32609,
+  buffer_dist = 10000
+)
 
 writeCDF(sm_2007_crop, "data/processed/sm_2007_crop.nc", overwrite = TRUE)
 writeCDF(sm_2008_crop, "data/processed/sm_2008_crop.nc", overwrite = TRUE)
@@ -49,7 +71,7 @@ writeCDF(sm_2009_crop, "data/processed/sm_2009_crop.nc", overwrite = TRUE)
 writeCDF(sm_2010_crop, "data/processed/sm_2010_crop.nc", overwrite = TRUE)
 writeCDF(sm_2011_crop, "data/processed/sm_2011_crop.nc", overwrite = TRUE)
 writeCDF(sm_2012_crop, "data/processed/sm_2012_crop.nc", overwrite = TRUE)
-writeCDF(sm_crop, "data/processed/sm_crop.nc", overwrite = TRUE)
+writeCDF(sm_proj, "data/processed/sm_proj.nc", overwrite = TRUE)
 
 sm_2007_crop <- terra::rast("data/processed/sm_2007_crop.nc", 
                        drivers="NETCDF")

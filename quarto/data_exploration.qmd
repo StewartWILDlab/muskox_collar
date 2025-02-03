@@ -106,6 +106,7 @@ surveydate_710 <- as.Date("2008-04-26")
 
 musk_collar_fix <- musk_collar %>%
   filter(Id_Number!=706|Date<xdate_706,
+         Id_Number!=706|Date!="2009-01-29",
          Id_Number!=707|Date<xdate_707,
          Id_Number!=709|Date<xdate_709,
          Id_Number!=710|Date<xdate_710) %>%

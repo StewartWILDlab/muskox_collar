@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.555">
+<meta name="generator" content="quarto-1.5.57">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>NWT Muskox Collar Project - Lifetime Home Range</title>
+<title>Lifetime Home Range – NWT Muskox Collar Project</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -33,7 +33,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -110,11 +110,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <header id="quarto-header" class="headroom fixed-top">
   <nav class="quarto-secondary-nav">
     <div class="container-fluid d-flex">
-      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
         <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/home_range.html">Lifetime Home Range</a></li></ol></nav>
-        <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
   </nav>
@@ -200,8 +200,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Before we can estimate home ranges for the collared muskoxen, we need to determine an appropriate movement model. To do this, we will use variograms. Our data has been updated to conform to Movebank naming conventions so that we can use the <strong>ctmm</strong> package.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ctmm)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>musk_move <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">"data/raw/muskox_data/musk_collar_filt_movebank.csv"</span>))</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>musk_tel <span class="ot">&lt;-</span> <span class="fu">as.telemetry</span>(musk_move)[<span class="fu">c</span>(<span class="sc">-</span><span class="dv">2</span>,<span class="sc">-</span><span class="dv">4</span>,<span class="sc">-</span><span class="dv">5</span>)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># musk_move &lt;- read.csv(here("data/raw/muskox_data/musk_collar_filt_movebank.csv"))</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>musk_move <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">here</span>(<span class="st">"data/processed/musk_move.rds"</span>))</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>musk_tel <span class="ot">&lt;-</span> <span class="fu">as.telemetry</span>(musk_move)[<span class="fu">c</span>(<span class="sc">-</span><span class="dv">2</span>,<span class="sc">-</span><span class="dv">4</span>,<span class="sc">-</span><span class="dv">5</span>)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>First we will plot empirical variograms for each collared muskoxen. Variograms are used to quantify spatial dependence between locations at different points in time. In general, as the time between locations increases, spatial dependence decreases. Variograms plot the semi-variance of distances between pairs of points separated by different time lags. At short time lags, these distances are very similar and the semi-variance is low. At large time lags, there is greater variability in the distances between points, so the semi-variance is high. Usually variograms will reach an asymptote in semi-variance that represents the time lag at which the animal is able to traverse their home range. For now we will leave out the muskoxen that had collar failures as they do not have enough data to estimate home ranges.</p>
 <div class="cell">
@@ -1044,21 +1045,21 @@ OUf anisotropic 1048.54150    0.000000 278.57428</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>$DOF
              708_1y   708_full
-708_1y          Inf 0.02654134
-708_full 0.02654134        Inf
+708_1y          Inf 0.02093334
+708_full 0.02093334        Inf
 
 $CI
 , , low
 
             708_1y  708_full
-708_1y   1.0000000 0.9739439
-708_full 0.9739439 1.0000000
+708_1y   1.0000000 0.9741037
+708_full 0.9741037 1.0000000
 
 , , est
 
             708_1y  708_full
-708_1y   1.0000000 0.9985354
-708_full 0.9985354 1.0000000
+708_1y   1.0000000 0.9986992
+708_full 0.9986992 1.0000000
 
 , , high
 
@@ -1073,21 +1074,21 @@ attr(,"class")
 <div class="cell-output cell-output-stdout">
 <pre><code>$DOF
              7013_1y  7013_full
-7013_1y          Inf 0.02370321
-7013_full 0.02370321        Inf
+7013_1y          Inf 0.02512895
+7013_full 0.02512895        Inf
 
 $CI
 , , low
 
             7013_1y 7013_full
-7013_1y   1.0000000 0.9304939
-7013_full 0.9304939 1.0000000
+7013_1y   1.0000000 0.9303894
+7013_full 0.9303894 1.0000000
 
 , , est
 
             7013_1y 7013_full
-7013_1y   1.0000000 0.9962163
-7013_full 0.9962163 1.0000000
+7013_1y   1.0000000 0.9961044
+7013_full 0.9961044 1.0000000
 
 , , high
 
@@ -1102,24 +1103,24 @@ attr(,"class")
 <div class="cell-output cell-output-stdout">
 <pre><code>$DOF
              7012_1y     7012_2y   7012_full
-7012_1y          Inf 0.010787278 0.063450291
-7012_2y   0.01078728         Inf 0.001045029
-7012_full 0.06345029 0.001045029         Inf
+7012_1y          Inf 0.010748805 0.063025413
+7012_2y   0.01074880         Inf 0.001036254
+7012_full 0.06302541 0.001036254         Inf
 
 $CI
 , , low
 
             7012_1y   7012_2y 7012_full
-7012_1y   1.0000000 0.7788884 0.7077171
-7012_2y   0.7788884 1.0000000 0.9198961
-7012_full 0.7077171 0.9198961 1.0000000
+7012_1y   1.0000000 0.7789010 0.7077855
+7012_2y   0.7789010 1.0000000 0.9198999
+7012_full 0.7077855 0.9198999 1.0000000
 
 , , est
 
             7012_1y   7012_2y 7012_full
-7012_1y   1.0000000 0.9910153 0.9716109
-7012_2y   0.9910153 1.0000000 0.9990379
-7012_full 0.9716109 0.9990379 1.0000000
+7012_1y   1.0000000 0.9910313 0.9717047
+7012_2y   0.9910313 1.0000000 0.9990420
+7012_full 0.9717047 0.9990420 1.0000000
 
 , , high
 
@@ -1135,24 +1136,24 @@ attr(,"class")
 <div class="cell-output cell-output-stdout">
 <pre><code>$DOF
              7011_1y    7011_2y  7011_full
-7011_1y          Inf 0.04519169 0.25421999
-7011_2y   0.04519169        Inf 0.01962155
-7011_full 0.25421999 0.01962155        Inf
+7011_1y          Inf 0.04099808 0.22865506
+7011_2y   0.04099808        Inf 0.01848155
+7011_full 0.22865506 0.01848155        Inf
 
 $CI
 , , low
 
             7011_1y   7011_2y 7011_full
-7011_1y   1.0000000 0.8329295 0.6522886
-7011_2y   0.8329295 1.0000000 0.8583128
-7011_full 0.6522886 0.8583128 1.0000000
+7011_1y   1.0000000 0.8334452 0.6567323
+7011_2y   0.8334452 1.0000000 0.8584988
+7011_full 0.6567323 0.8584988 1.0000000
 
 , , est
 
             7011_1y   7011_2y 7011_full
-7011_1y   1.0000000 0.9870628 0.9537464
-7011_2y   0.9870628 1.0000000 0.9926771
-7011_full 0.9537464 0.9926771 1.0000000
+7011_1y   1.0000000 0.9876739 0.9560804
+7011_2y   0.9876739 1.0000000 0.9928922
+7011_full 0.9560804 0.9928922 1.0000000
 
 , , high
 
@@ -1206,18 +1207,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     }
     return false;
   }
-  const clipboard = new window.ClipboardJS('.code-copy-button', {
-    text: function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
-      for (const childEl of codeEl.children) {
-        if (isCodeAnnotation(childEl)) {
-          childEl.remove();
-        }
-      }
-      return codeEl.innerText;
-    }
-  });
-  clipboard.on('success', function(e) {
+  const onCopySuccess = function(e) {
     // button target
     const button = e.trigger;
     // don't keep focus
@@ -1249,7 +1239,29 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     }, 1000);
     // clear code selection
     e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
   });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
     var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
     var mailtoRegex = new RegExp(/^mailto:/);
       var filterRegex = new RegExp('/' + window.location.host + '/');
@@ -1257,7 +1269,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
         return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
     }
     // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
     for (var i=0; i<links.length; i++) {
       const link = links[i];
       if (!isInternal(link.href)) {
