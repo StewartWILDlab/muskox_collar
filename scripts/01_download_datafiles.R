@@ -13,6 +13,11 @@ dir.create("data/raw/landcover", showWarnings = FALSE)
 dir.create("data/raw/geography", showWarnings = FALSE)
 dir.create("data/raw/MRDEM", showWarnings = FALSE)
 dir.create("data/raw/SCANFI", showWarnings = FALSE)
+dir.create("data/raw/fire", showWarnings = FALSE)
+dir.create("data/raw/fire/NBAC", showWarnings = FALSE)
+dir.create("data/raw/fire/NFD", showWarnings = FALSE)
+dir.create("data/raw/fire/NTEMS", showWarnings = FALSE)
+dir.create("data/raw/weather", showWarnings = FALSE)
 
 ### download 2010 Land Cover of Canada .tif
 tif_url <- "https://datacube-prod-data-public.s3.ca-central-1.amazonaws.com/store/land/landcover/landcover-2010-classification.tif"
@@ -68,6 +73,32 @@ download.file(scanfi_lc_dbf_url, "data/raw/SCANFI/scanfi_lc.tif.vat.dbf")
 
 ### Download water body data
 
+### Download historical fire polygons from NBAC (1972 - 2023)
+fire_year_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nbac/nbac_1972_2023_20240530_shp.zip"
+fire_year_meta_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nbac/nbac_1972_2023_20240530_shp_metadata.pdf"
+download.file(fire_year_url, "data/raw/fire/NBAC/nbac_fire_year.shp.zip")
+download.file(fire_year_meta_url, "data/raw/fire/NBAC/nbac_fire_year.pdf")
+unzip("data/raw/fire/NBAC/nbac_fire_year.shp.zip", exdir = "data/raw/fire/NBAC")
 
-### Download historical fire data
+### Download historical fire polygons from NFD (1965 - 2023)
+fire_year_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
+download.file(fire_year_url, "data/raw/fire/NFD/nfd_fire_year.zip")
+unzip("data/raw/fire/NFD/nfd_fire_year.zip", exdir = "data/raw/fire/NFD")
+
+
+### Download historical fire data from NTEMS (1985 - 2020)
+# fire_year_url <- "https://opendata.nfis.org/downloads/forest_change/CA_Forest_Fire_1985-2020.zip"
+fire_nbr_url <- "https://opendata.nfis.org/downloads/forest_change/CA_Forest_Wildfire_dNBR_1985_2020.zip"
+# download.file(fire_year_url, "data/raw/fire/NTEMS/ntems_fire_year.zip")
+download.file(fire_nbr_url, "data/raw/fire/NTEMS/ntems_fire_nbr.zip")
+# unzip("data/raw/fire/NTEMS/ntems_fire_year.zip", exdir = "data/raw/fire/NTEMS")
+unzip("data/raw/fire/NTEMS/ntems_fire_nbr.zip", exdir = "data/raw/fire/NTEMS")
+
+
+### Download climate station data
+## climate station locations
+climate_stations_url <- "https://dd.weather.gc.ca/climate/observations/climate_station_list.csv"
+download.file(climate_stations_url, "data/raw/weather/climate_station_list.csv")
+nwt_station_files <- list.files("https://dd.weather.gc.ca/climate/observations/daily/csv/NT",
+                                all.files = TRUE, full.names = TRUE)
 

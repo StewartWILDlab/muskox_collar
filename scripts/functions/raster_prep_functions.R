@@ -40,17 +40,15 @@ rasterize_by_date <- function(vec, datetime_col, date,
   return(rast)
 }
 
-rasterize_fire_year <- function(vec, datetime_col, date, 
+rasterize_fire_year <- function(vec, year_col, date, 
                               temp_rast){
   print(date)
   min_year = vec %>%
-    pull(datetime_col) %>%
-    year() %>%
+    pull(year_col) %>%
     min(na.rm = TRUE)
   rast <- vec %>%
-    rename("datetime":={{datetime_col}}) %>%
-    mutate(year = year(datetime),
-           year_diff = year(date) - year) %>%
+    rename("year":={{year_col}}) %>%
+    mutate(year_diff = year(date) - year) %>%
     filter(year_diff > 0) %>%
     rasterize(temp_rast,
               field = "year_diff",

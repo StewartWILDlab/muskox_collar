@@ -36,10 +36,13 @@ mrdtm_proj <- crop_and_reproject_to_gps_points(
 ### start with a 3 by 3 region around cell of interest, resolution is 30 m so 
 ### that equates to a 90 by 90 m box around each point
 mrtri3_proj <- spatialEco::tri(mrdtm_proj, s = 3, exact = FALSE)
+mrtpi_proj <- spatialEco::tpi(mrdtm_proj, s = 25)
 
 writeRaster(mrdtm_crop, "data/processed/mrdtm_crop.tif", overwrite = TRUE)
 writeRaster(mrdtm_proj, "data/processed/mrdtm_proj.tif", overwrite = TRUE)
 writeRaster(mrtri3_proj, "data/processed/mrtri3_proj.tif", overwrite = TRUE)
 
-
-
+temp <- mrtpi_proj >= 30
+NAflag(temp) <- FALSE
+temp2 <- distance(temp)
+temp3 <- log(temp2+15)
