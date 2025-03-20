@@ -269,7 +269,8 @@ plot_wintrange <- function(id, min_year){
     mutate(month_flag = ifelse(month==9|month==10, 
                                "Sep-Oct", 
                                ifelse(month==4|month==5, "Apr-May", "Winter")),
-           month_flag = factor(month_flag, levels = c("Sep-Oct", "Apr-May", "Winter")))
+           month_flag = factor(month_flag, levels = c("Sep-Oct", "Apr-May", "Winter"))) %>%
+    st_transform("EPSG:32609")
 
   lc_2010_crop <- terra::rast(here("data/processed/lc_2010_proj.tif")) %>%
       terra::crop(musk_mig)
@@ -330,86 +331,123 @@ lines <- musk_migstart %>%
   summarise(do_union = FALSE) %>%
   st_cast("LINESTRING")
 
-season_end <- musk_migstart %>%
-  sf::st_drop_geometry() %>%
-  filter(Id_Number==706&datetime%in%as_datetime(c("2008-05-05 00:00:00",
-                                                  "2009-05-01 16:00:00"))|
-         Id_Number==710&datetime%in%as_datetime(c("2008-04-09 16:00:00"))|
-         Id_Number==709&datetime%in%as_datetime(c("2008-03-21 16:00:00"))|
-         Id_Number==707&datetime%in%as_datetime(c("2008-01-09 16:00:00"))|
-         Id_Number==7010&datetime%in%as_datetime(c("2010-01-19 16:00:00",
-                                                   "2009-05-15 00:00:00"))|
-         Id_Number==7011&datetime%in%as_datetime(c("2011-05-21 00:00:00",
-                                                   "2010-04-29 00:00:00",
-                                                   "2009-05-04 00:00:00",
-                                                   "2011-12-21 08:00:00"))|
-         Id_Number==7012&datetime%in%as_datetime(c("2011-05-24 00:00:00",
-                                                   "2010-05-03 08:00:00",
-                                                   "2012-02-18 16:00:00",
-                                                   "2009-05-19 08:00:00"))|
-         Id_Number==7013&datetime%in%as_datetime(c("2011-05-21 16:00:00",
-                                                   "2010-05-11 00:00:00",
-                                                   "2009-05-21 00:00:00"))|
-         Id_Number==708&datetime%in%as_datetime(c("2010-05-06 08:00:00",
-                                                  "2009-05-09 00:00:00",
-                                                  "2010-12-09 08:00:00"))|
-         Id_Number==7080&datetime%in%as_datetime(c("2008-05-10 00:00:00",
-                                                   "2009-05-09 16:00:00"))) %>%
-  rename(season_end = datetime) %>%
-  dplyr::select(Id_Number, year_min, season_end)
 
-season_start <- musk_migstart %>%
-  sf::st_drop_geometry() %>%
-  filter(Id_Number==706&datetime%in%as_datetime(c("2008-10-25 00:00:00",
-                                                  "2007-12-03 16:00:00"))|
-         Id_Number==7010&datetime%in%as_datetime(c("2009-10-22 08:00:00",
-                                                   "2009-02-09 08:00:00"))|
-         Id_Number==710&datetime%in%as_datetime(c("2008-01-20 00:00:00"))|
-         Id_Number==709&datetime%in%as_datetime(c("2008-01-20 00:00:00"))|
-         Id_Number==707&datetime%in%as_datetime(c("2007-12-03 16:00:00"))|
-         Id_Number==7011&datetime%in%as_datetime(c("2010-11-14 00:00:00",
-                                                   "2009-11-18 00:00:00",
-                                                   "2009-02-04 08:00:00",
-                                                   "2011-09-28 00:00:00"))|
-         Id_Number==7012&datetime%in%as_datetime(c("2011-10-26 08:00:00",
-                                                   "2010-11-26 16:00:00",
-                                                   "2009-10-20 16:00:00",
-                                                   "2009-02-08 00:00:00"))|
-         Id_Number==7013&datetime%in%as_datetime(c("2010-11-26 16:00:00",
-                                                   "2009-10-17 00:00:00",
-                                                   "2009-02-17 00:00:00"))|
-         Id_Number==708&datetime%in%as_datetime(c("2009-10-25 00:00:00",
-                                                  "2009-02-24 00:00:00",
-                                                  "2010-11-16 16:00:00"))|
-         Id_Number==7080&datetime%in%as_datetime(c("2007-12-03 16:00:00",
-                                                   "2008-10-18 08:00:00")))%>%
-  rename(season_start = datetime) %>%
-  dplyr::select(Id_Number, year_min, season_start)
+season_loc <- tibble(Id_Number = 706, 
+                     start_date = c("2007-12-03 16:00:00",
+                                    "2008-05-05 00:00:00",
+                                    "2008-10-25 00:00:00",
+                                    "2009-05-01 16:00:00"),
+                     end_date = c("2008-05-05 00:00:00",
+                                  "2008-10-25 00:00:00",
+                                  "2009-05-01 16:00:00",
+                                  "2009-09-01 16:00:00"),
+                     season = c("Winter", "Summer", "Winter", "Summer")) %>%
+  bind_rows(tibble(Id_Number = 707, 
+                   start_date = c("2007-12-03 16:00:00"),
+                   end_date = c("2008-01-09 16:00:00"),
+                   season = c("Winter"))) %>%
+  bind_rows(tibble(Id_Number = 708, 
+                   start_date = c("2009-02-24 00:00:00",
+                                  "2009-05-09 00:00:00",
+                                  "2009-10-25 00:00:00",
+                                  "2010-05-06 08:00:00",
+                                  "2010-11-16 16:00:00"),
+                   end_date = c("2009-05-09 00:00:00",
+                                "2009-10-25 00:00:00",
+                                "2010-05-06 08:00:00",
+                                "2010-11-16 16:00:00",
+                                "2010-12-09 08:00:00"),
+                   season = c("Winter", "Summer", "Winter", 
+                              "Summer", "Winter"))) %>%
+  bind_rows(tibble(Id_Number = 709, 
+                   start_date = c("2008-01-20 00:00:00"),
+                   end_date = c("2008-03-21 16:00:00"),
+                   season = c("Winter"))) %>%
+  bind_rows(tibble(Id_Number = 710, 
+                   start_date = c("2008-01-20 00:00:00"),
+                   end_date = c("2008-04-09 16:00:00"),
+                   season = c("Winter"))) %>%
+  bind_rows(tibble(Id_Number = 7010, 
+                   start_date = c("2009-02-09 08:00:00",
+                                  "2009-05-15 00:00:00",
+                                  "2009-10-22 08:00:00"),
+                   end_date = c("2009-05-15 00:00:00",
+                                "2009-10-22 08:00:00",
+                                "2010-01-19 16:00:00"),
+                   season = c("Winter", "Summer", "Winter"))) %>%
+  bind_rows(tibble(Id_Number = 7011, 
+                   start_date = c("2009-02-04 08:00:00",
+                                  "2009-05-04 00:00:00",
+                                  "2009-11-18 00:00:00",
+                                  "2010-04-29 00:00:00",
+                                  "2010-11-14 00:00:00",
+                                  "2011-05-21 00:00:00",
+                                  "2011-09-28 00:00:00"),
+                   end_date = c("2009-05-04 00:00:00",
+                                "2009-11-18 00:00:00",
+                                "2010-04-29 00:00:00",
+                                "2010-11-14 00:00:00",
+                                "2011-05-21 00:00:00",
+                                "2011-09-28 00:00:00",
+                                "2011-12-21 08:00:00"),
+                   season = c("Winter", "Summer", "Winter", 
+                              "Summer", "Winter","Summer", "Winter"))) %>%
+  bind_rows(tibble(Id_Number = 7012, 
+                   start_date = c("2009-02-08 00:00:00",
+                                  "2009-05-19 08:00:00",
+                                  "2009-10-20 16:00:00",
+                                  "2010-05-03 08:00:00",
+                                  "2010-11-26 16:00:00",
+                                  "2011-05-24 00:00:00",
+                                  "2011-10-26 08:00:00"),
+                   end_date = c("2009-05-19 08:00:00",
+                                "2009-10-20 16:00:00",
+                                "2010-05-03 08:00:00",
+                                "2010-11-26 16:00:00",
+                                "2011-05-24 00:00:00",
+                                "2011-10-26 08:00:00",
+                                "2012-02-18 16:00:00"),
+                   season = c("Winter", "Summer", "Winter", 
+                              "Summer", "Winter","Summer", "Winter"))) %>%
+  bind_rows(tibble(Id_Number = 7013, 
+                   start_date = c("2009-02-17 00:00:00",
+                                  "2009-05-21 00:00:00",
+                                  "2009-10-17 00:00:00",
+                                  "2010-05-11 00:00:00",
+                                  "2010-11-26 16:00:00",
+                                  "2011-05-21 16:00:00"),
+                   end_date = c("2009-05-21 00:00:00",
+                                "2009-10-17 00:00:00",
+                                "2010-05-11 00:00:00",
+                                "2010-11-26 16:00:00",
+                                "2011-05-21 16:00:00",
+                                "2011-09-01 16:00:00"),
+                   season = c("Winter", "Summer", "Winter", 
+                              "Summer", "Winter", "Summer"))) %>%
+  bind_rows(tibble(Id_Number = 7080, 
+                   start_date = c("2007-12-03 16:00:00",
+                                  "2008-05-10 00:00:00",
+                                  "2008-10-18 08:00:00",
+                                  "2009-05-09 16:00:00"),
+                   end_date = c("2008-05-10 00:00:00",
+                                "2008-10-18 08:00:00",
+                                "2009-05-09 16:00:00",
+                                "2009-09-01 16:00:00"),
+                   season = c("Winter", "Summer", "Winter", "Summer"))) %>%
+  mutate(start_date = as_datetime(start_date),
+         end_date = as_datetime(end_date),
+         Id_Number = factor(Id_Number))
 
-musk_wint <- musk_migstart %>%
-  left_join(season_start) %>%
-  left_join(season_end) %>%
-  mutate(season = ifelse(datetime<season_start,"Fall",
-                         ifelse(datetime>=season_end,"Spring",
-                                ifelse(month>=4&month<7,"Calving","Winter"))))
 
-pal <- colorFactor(
-  palette = c('red', 'blue', 'green', 'yellow'),
-  domain = c(musk_wint$season,"Summer")
-)
 
 wms_lc <- "https://datacube.services.geo.ca/ows/landcover"
 wms_lc <-  "https://www.apps.geomatics.gov.nt.ca/arcgis/services/GNWT/InlandWater_LCC/MapServer/WmsServer?"
 
-m <- musk_wint %>%
-  bind_rows(snowdepth_locs %>%
-  filter(month < 9&month > 5) %>%
-    mutate(season = "Summer")) %>%
+m <- musk_migstart %>%
   leaflet() %>%
   addPolylines(data = lines,
                group = ~Id_Number) %>%
-  addCircles(color = ~pal(season),
-             label = ~ Id_Number,
+  addCircles(label = ~ Id_Number,
              popup = ~paste(datetime),
              group = ~Id_Number) %>%
   addLayersControl(
@@ -417,7 +455,6 @@ m <- musk_wint %>%
     options = layersControlOptions(collapsed = FALSE)
   ) %>%
   addMeasure(primaryLengthUnit = "meters") %>%
-  addLegend(pal=pal, values = ~season) %>%
   ### remember to specify the WMS version or it won't load
   # addWMSTiles(wms_dtm, layers = "dsm",
   #              options = WMSTileOptions(format = "image/png",
@@ -437,18 +474,26 @@ webshot("temp.html", file = "Rplot.png",
 #| dependson: "load-data"
 #| echo: FALSE
 
+loc_func <- function(id, date){
+  season = season_loc %>% 
+           filter(Id_Number == id,
+                  start_date<=date,
+                  end_date>date) %>%
+           pull(season)
+  if (length(season)==0){season = NA}
+  return(season)
+}
+
+
 musk_season <- musk_collar_filt %>%
   ## create year_min to match with season start and end dates
-  mutate(year_min = ifelse(month>=6,year,year-1)) %>%
-  left_join(season_start) %>%
-  left_join(season_end) %>%
+  rowwise() %>%
+  left_join(season_loc, relationship = "many-to-many") %>%
+  filter(start_date<=datetime,
+         end_date>datetime) %>%
   mutate(season = case_when(
-    month>=6&month<=8~"Summer",
-    datetime>=season_start&(month<4|month>=9)~"Winter",
-    month>=4&datetime<=season_end&month<=5~"Calving",
-    month>=5&month<=11~"Summer",
-    TRUE~NA)) %>%
-  dplyr::select(-year_min)
+    month>=4&season=="Winter"&month<=5~"Calving",
+    TRUE~season))
   
 
 saveRDS(musk_season, here("data/processed/musk_season.rds"))

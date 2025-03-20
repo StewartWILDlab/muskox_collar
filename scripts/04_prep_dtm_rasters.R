@@ -45,4 +45,5 @@ writeRaster(mrtri3_proj, "data/processed/mrtri3_proj.tif", overwrite = TRUE)
 temp <- mrtpi_proj >= 30
 NAflag(temp) <- FALSE
 temp2 <- distance(temp)
+plot(temp2)
 temp3 <- log(temp2+15)

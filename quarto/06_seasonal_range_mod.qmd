@@ -258,7 +258,11 @@ musk_sum <- bind_rows(musk_sum_home, musk_sum_core)
 #| dependson: "musk_sum"
 
 musk_sum_sum <- musk_sum %>%
-  mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
+  mutate(for_lc = ifelse(cover%in%c("Temperate or sub-polar shrubland",
+                                    "Temperate or sub-polar grassland",
+                                    "Sub-polar or polar shrubland-lichen-moss",
+                                    "Sub-polar or polar grassland-lichen-moss",
+                                    "Sub-polar or polar barren-lichen-moss"),1,0)) %>%
   group_by(range_id, range) %>%
   summarise(total = sum(n),
             for_tot = sum(n*for_lc),
@@ -401,7 +405,11 @@ musk_sum_buf <- musk_seascont %>%
 #| dependson: "musk_sum_buf"
 
 musk_sum_sum3 <- musk_sum_buf %>%
-  mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
+  mutate(for_lc = ifelse(cover%in%c("Temperate or sub-polar shrubland",
+                                    "Temperate or sub-polar grassland",
+                                    "Sub-polar or polar shrubland-lichen-moss",
+                                    "Sub-polar or polar grassland-lichen-moss",
+                                    "Sub-polar or polar barren-lichen-moss"),1,0)) %>%
   # ### remove water land cover from calculation of total land cover
   # filter(Canada2010 != 18) %>%
   group_by(range_id, group, buffer) %>%
@@ -416,7 +424,7 @@ musk_sum_sum3 <- musk_sum_buf %>%
 musk_sum_sum3 %>%
   filter(buffer == 7000|group!="home range") %>%
   mutate(group2 = str_c(buffer/1000," km ",group),
-         group2 = ifelse(group == "home range",group,group2),
+         group2 = ifelse(group == "home range",as.character(group),group2),
          group2 = factor(group2, 
                          levels = c("home range","3.5 km buffer",
                                     "7 km buffer", "14 km buffer"))) %>%
@@ -652,7 +660,7 @@ musk_elev %>%
 
 elev_mod <- nlme::lme(value~group, random=~1|Id_Number/year_min, 
                  data = musk_elev %>% filter(buffer == dist))
-summary(elev_mod1)
+summary(elev_mod)
 ```
 
 Home range are on average higher elevation than the adjacent land, though this difference in elevation is small, around 24 m on average. However, this difference appears to increase as you increase the buffer size, going to 31 m when the buffer size is doubled and 51 m when the buffer size is quadrupled. It's also worth noting that there is a positive increase in elevation in all but two instances and the largest increases happen at higher elevations. Given previous discussions, there may be two main areas that muskoxen go to during the winter: steep cliffs at high elevations and lake shores at lower elevations.
@@ -847,7 +855,7 @@ hr_shift <- function(hr, seed){
                     lc_2010_crop2, touches = TRUE)
     ct <- crosstab(c(zones, lc_2010_crop2)) %>%
       as_tibble() %>%
-      mutate(water = ifelse(Canada2010==18,1,0)) %>%
+      mutate(water = ifelse(cover=="Water",1,0)) %>%
       summarise(total = sum(n),
                 wat_tot = sum(n*water),
                 wat_per = wat_tot/total) %>%
@@ -914,7 +922,11 @@ sum_pseudo <- musk_pseudohr %>%
 #| dependson: "sum_pseudo"
 
 musk_sum_lc <- sum_pseudo %>%
-  mutate(for_lc = ifelse(Canada2010%in%c(8,10,11,12,13),1,0)) %>%
+  mutate(for_lc = ifelse(cover%in%c("Temperate or sub-polar shrubland",
+                                    "Temperate or sub-polar grassland",
+                                    "Sub-polar or polar shrubland-lichen-moss",
+                                    "Sub-polar or polar grassland-lichen-moss",
+                                    "Sub-polar or polar barren-lichen-moss"),1,0)) %>%
   group_by(range_id, group) %>%
   summarise(total = sum(n),
             for_tot = sum(n*for_lc),
@@ -930,7 +942,7 @@ musk_sum_lc %>%
   geom_boxplot() 
 
 
-set_seed(5)
+set.seed(5)
 sum_pseudo_brm <- brms::brm(true_range ~ scale(for_per) + 
                          (1|Id_Number), family = "bernoulli",
                        data = musk_sum_lc,
@@ -1005,7 +1017,7 @@ musk_wint_tpi %>%
 
 
 
-set_seed(5)
+set.seed(5)
 wint_pseudo_brm <- brms::brm(true_range ~ scale(value) + 
                          (1|Id_Number), family = "bernoulli",
                        data = musk_wint_tpi,
@@ -1018,16 +1030,6 @@ summary(wint_pseudo_brm)
 ```
 
 Home ranges are associated with higher topographic position indices indicating winter home ranges are more often elevated relative to their surroundings. Let's plot the winter home ranges on the TPI raster to better visualize it:
-
-```{r}
-musk_pseudohr %>%
-  filter(season == "Winter") %>%
-  select(-new_geometry) %>%
-  st_transform(4326) %>%
-  leaflet::leaflet() %>%
-  leaflet::addPolygons() %>%
-  leaflet::addRasterImage(tpi_crop)
-```
 
 ## Calving Model
 
@@ -1065,7 +1067,7 @@ calv_pseudo_mod <- lme4::glmer(true_range ~ scale(value) +
                        data = musk_calv_tpi)
 summary(calv_pseudo_mod)
 
-set_seed(5)
+set.seed(5)
 calv_pseudo_brm <- brms::brm(true_range ~ scale(value) + 
                          (1|Id_Number), family = "bernoulli",
                        data = musk_calv_tpi,

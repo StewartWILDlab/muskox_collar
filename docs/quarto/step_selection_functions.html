@@ -113,9 +113,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
-      NWT Muskox Collar Project
-      </li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../quarto/step_selection_functions.html">Integrated Step Selection Functions</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
     </div>
@@ -134,38 +132,44 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <ul class="list-unstyled mt-1">
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/data_exploration.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/01_data_exploration.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Data Cleaning</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/movement_patterns.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/02_movement_patterns.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Movement Patterns</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/home_range.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/03_home_range.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Lifetime Home Range</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/annual_range.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/04_annual_range.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Annual Home Range</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/seasonal_range.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/05_seasonal_range.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Seasonal Range</span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../quarto/seasonal_range_mod.html" class="sidebar-item-text sidebar-link">
+  <a href="../quarto/06_seasonal_range_mod.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Home Range Modelling</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../quarto/step_selection_functions.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Integrated Step Selection Functions</span></a>
   </div>
 </li>
     </ul>
@@ -197,67 +201,136 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>In this document, we will use integrated step selection analysis (iSSA) to model movement decisions of the Sahtu muskoxen. Models will be fit using the <strong>amt</strong> package. We’ll start by loading the data and required packages:</p>
-<p>Next let’s look at some of the relationships between the spatial data we’ll be using in the models. First let’s look at historical fire data and how it relates to forest cover data:</p>
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> musk_collar_filt) <span class="sc">+</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> fire_data_subset <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fireyear<span class="sc">&lt;=</span><span class="dv">2012</span>),</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>          <span class="at">colour =</span> <span class="cn">NA</span>, <span class="at">fill =</span> <span class="st">"red"</span>, <span class="at">alpha =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">"Fires from 1997 - 2012"</span>)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>prcC_2020_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/prcC_2020_proj.tif"</span>))</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  tidyterra<span class="sc">::</span><span class="fu">geom_spatraster</span>(<span class="at">data =</span> prcC_2020_proj) <span class="sc">+</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> fire_data_subset <span class="sc">%&gt;%</span> nngeo<span class="sc">::</span><span class="fu">st_remove_holes</span>(),</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>          <span class="fu">aes</span>(<span class="at">colour =</span> fireyear), <span class="at">fill =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">trans =</span> <span class="st">"sqrt"</span>) <span class="sc">+</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_gradient</span>(<span class="at">high =</span> <span class="st">"white"</span>, <span class="at">low =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">fill =</span> <span class="st">"SCANFI canopy</span><span class="sc">\n</span><span class="st">cover in 2020"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>&lt;SpatRaster&gt; resampled to 501102 cells.</code></pre>
-</div>
-<div class="cell quarto-layout-panel" data-layout-ncol="1" data-layout-align="left">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
-<p><img src="step_selection_functions_files/figure-html/data_exploration-1.png" class="img-fluid"></p>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
-<p><img src="step_selection_functions_files/figure-html/data_exploration-2.png" class="img-fluid"></p>
-</div>
-</div>
-</div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="do">### group data by ID and season</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>issa_data <span class="ot">&lt;-</span> musk_collar_filt <span class="sc">%&gt;%</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(snowdepth_locs) <span class="sc">%&gt;%</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year, Id_Number) <span class="sc">%&gt;%</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">season =</span> <span class="fu">season_delineation</span>(datetime, snow_depth, <span class="fl">0.1</span>),</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_min =</span> <span class="fu">minimum_year_season</span>(year,datetime,season))  <span class="sc">%&gt;%</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">id_season =</span> <span class="fu">str_c</span>(Id_Number,<span class="st">"_"</span>,season)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="dv">32609</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">1</span>],</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">2</span>]) <span class="sc">%&gt;%</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="do">### group data by ID and season</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>musk_collar_season <span class="ot">&lt;-</span> musk_collar_filt <span class="sc">%&gt;%</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(snowdepth_locs) <span class="sc">%&gt;%</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year, Id_Number) <span class="sc">%&gt;%</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">season =</span> <span class="fu">season_delineation</span>(datetime, snow_depth, <span class="fl">0.1</span>),</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_min =</span> <span class="fu">minimum_year_season</span>(year,datetime,season))  <span class="sc">%&gt;%</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">id_season =</span> <span class="fu">str_c</span>(Id_Number,<span class="st">"_"</span>,season)) <span class="sc">%&gt;%</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Joining with `by = join_by(Id_Number, Latitude, Longitude, datetime)`</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="do">### convert data into tracks for amt package</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>issa_track <span class="ot">&lt;-</span> <span class="fu">make_track</span>(issa_data, </span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                   x, </span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>                   y, </span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                   datetime, </span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>                   <span class="at">id_season =</span> id_season,</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>                   <span class="at">id =</span> Id_Number,</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>                   <span class="at">season =</span> season,</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>                   <span class="at">crs =</span> <span class="dv">4326</span>)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="do">### nest tracks by ID season</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>issa_track_nest <span class="ot">&lt;-</span> issa_track <span class="sc">%&gt;%</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nest</span>(<span class="at">data =</span> <span class="sc">-</span><span class="fu">c</span>(id,id_season,season))</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(issa_track_nest)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Next let’s look at some of the relationships between the spatial data we’ll be using in the models. First let’s look at historical fire data and how it relates to forest cover data:</p>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># nbr_proj &lt;- terra::rast(here("data/processed/ntems_fire_nbr_proj.tif"))</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># # nbr_cat &lt;- nbr_proj</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># # nbr_cat[nbr_proj&gt;66] &lt;- 3</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># # nbr_cat[nbr_proj&lt;=66&amp;nbr_proj&gt;27] &lt;- 2</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># # nbr_cat[nbr_proj&lt;=27] &lt;- 1</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># # plot(nbr_cat)</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> musk_collar_season) <span class="sc">+</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> fire_data_subset <span class="sc">%&gt;%</span> </span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>            <span class="fu">st_transform</span>(<span class="fu">st_crs</span>(musk_collar_season)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>            <span class="fu">st_crop</span>(musk_collar_season) <span class="sc">%&gt;%</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>            <span class="fu">filter</span>(fireyear<span class="sc">&lt;=</span><span class="dv">2012</span>),</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>          <span class="at">colour =</span> <span class="cn">NA</span>,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>          <span class="fu">aes</span>(<span class="at">fill =</span> fireyear), <span class="at">alpha =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>() <span class="sc">+</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">"Fires from 1997 - 2012"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: attribute variables are assumed to be spatially constant throughout
+all geometries</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>prcC_2020_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/prcC_2020_proj.tif"</span>))</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>lc_2010_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/lc_2010_proj.tif"</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  tidyterra<span class="sc">::</span><span class="fu">geom_spatraster</span>(<span class="at">data =</span> lc_2010_proj) <span class="sc">+</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> fire_data_subset <span class="sc">%&gt;%</span> </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>            <span class="fu">st_crop</span>(lc_2010_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>            <span class="fu">filter</span>(fireyear<span class="sc">&lt;=</span><span class="dv">2010</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>                   fireyear<span class="sc">&gt;=</span><span class="dv">1985</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>            nngeo<span class="sc">::</span><span class="fu">st_remove_holes</span>(),</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>          <span class="fu">aes</span>(<span class="at">colour =</span> fireyear), <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">linewidth =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># scale_fill_viridis_c(trans = "sqrt") +</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_gradient</span>(<span class="at">high =</span> <span class="st">"darkred"</span>, <span class="at">low =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">fill =</span> <span class="st">"SCANFI canopy</span><span class="sc">\n</span><span class="st">cover in 2020"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>&lt;SpatRaster&gt; resampled to 501102 cells.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: attribute variables are assumed to be spatially constant throughout
+all geometries</code></pre>
+</div>
+<div class="cell quarto-layout-panel" data-layout-ncol="1">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: center;">
+<p><img src="step_selection_functions_files/figure-html/fire_hist_data-1.png" class="img-fluid"></p>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: center;">
+<p><img src="step_selection_functions_files/figure-html/fire_hist_data-2.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<p>The first image shows that muskoxen appear to favour areas impacted by recent fires to some degree. The second image shows that canopy cover is also impacted by recent fires, although the relative recency of the fire doesn’t seem to have a large effect on differences in canopy cover across areas impacted by fires. In any case, it will be important to account for changes in canopy cover that have occurred since the collars stopped recording as these areas likely had higher canopy cover during the monitoring period.</p>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>mrtri3_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/mrtri3_proj.tif"</span>))</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  tidyterra<span class="sc">::</span><span class="fu">geom_spatraster</span>(<span class="at">data =</span> mrtri3_proj) <span class="sc">+</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> musk_collar_season, <span class="at">colour =</span> <span class="st">"red"</span>, <span class="at">alpha =</span> <span class="fl">0.1</span>) <span class="sc">+</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">trans =</span> <span class="st">"sqrt"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>&lt;SpatRaster&gt; resampled to 501102 cells.</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># musk_collar_season %&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">#   leaflet::leaflet() %&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="co">#   leaflet::addCircles() %&gt;%</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   leaflet::addRasterImage(mrtri3_proj %&gt;%</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co">#                             terra::aggregate(5))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell quarto-layout-panel" data-layout-ncol="1">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: center;">
+<p><img src="step_selection_functions_files/figure-html/dem_data-1.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<p>There does seem to be avoidance of some areas with high TRI values, however muskox do appear to cross ridge tops to get to potential foraging areas on the other side. Lastly, let’s look at the proximity to water and how it relates to muskox movements.</p>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>water_dist <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/water_dist.tif"</span>))</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  tidyterra<span class="sc">::</span><span class="fu">geom_spatraster</span>(<span class="at">data =</span> <span class="fu">log</span>(water_dist<span class="sc">/</span><span class="dv">1000</span><span class="sc">+</span><span class="dv">1</span>)) <span class="sc">+</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> musk_collar_season, <span class="at">colour =</span> <span class="st">"red"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>&lt;SpatRaster&gt; resampled to 501102 cells.</code></pre>
+</div>
+<div class="cell quarto-layout-panel" data-layout-ncol="1">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: center;">
+<p><img src="step_selection_functions_files/figure-html/waterprox-1.png" class="img-fluid"></p>
+</div>
+</div>
+</div>
+<p>Doesn’t seem to be a huge correlation between GPS points and proximity to water, but still worth exploring further in some models.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>issa_data <span class="ot">&lt;-</span> musk_collar_season <span class="sc">%&gt;%</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="dv">32609</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">1</span>],</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">2</span>]) <span class="sc">%&gt;%</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>()</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="do">### convert data into tracks for amt package</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>issa_track <span class="ot">&lt;-</span> <span class="fu">make_track</span>(issa_data, </span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>                   x, </span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>                   y, </span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>                   datetime, </span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>                   <span class="at">id_season =</span> id_season,</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>                   <span class="at">id =</span> Id_Number,</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>                   <span class="at">season =</span> season,</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>                   <span class="at">crs =</span> <span class="dv">4326</span>)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="do">### nest tracks by ID season</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>issa_track_nest <span class="ot">&lt;-</span> issa_track <span class="sc">%&gt;%</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nest</span>(<span class="at">data =</span> <span class="sc">-</span><span class="fu">c</span>(id,id_season,season))</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(issa_track_nest)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 6 × 4
   id_season   id    season data                
@@ -270,27 +343,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 6 7080_summer 7080  summer &lt;trck_xyt [824 × 3]&gt;</code></pre>
 </div>
 </div>
+<section id="issa-models" class="level2">
+<h2 class="anchored" data-anchor-id="issa-models">ISSA Models</h2>
+<p>Lets prepare the data for use in ISSA. We’ll first resample the data to ensure each step is 8 hours in length. Next we will convert groups of steps into bursts, where a new burst occurs when the time between subsequent steps is greater than 8 hours. Lastly, we will sample random steps for each observed step so that we can compare available and used locations. We use the recommended sample size of 10 for available steps, but will test the robustness of these models by increasing the sample size once we have an appropriate model.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="do">### create bursts whenever time between steps exceeds 8 hours and</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="do">### transform locations into steps</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>issa_bursts_summer <span class="ot">&lt;-</span> issa_track_nest <span class="sc">%&gt;%</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"summer"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">data_resamp =</span> <span class="fu">map</span>(data, <span class="cf">function</span>(x)</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>      x <span class="sc">%&gt;%</span> <span class="fu">track_resample</span>(<span class="at">rate =</span> <span class="fu">hours</span>(<span class="dv">8</span>), <span class="at">tolerance =</span> <span class="fu">hours</span>(<span class="dv">1</span>))</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>      ),</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">steps =</span> <span class="fu">map2</span>(data,data_resamp, <span class="cf">function</span>(x,y)</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span>(<span class="fu">length</span>(<span class="fu">unique</span>(y<span class="sc">$</span>burst_))<span class="sc">==</span><span class="dv">1</span>)</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        x <span class="sc">%&gt;%</span> <span class="fu">steps</span>()</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>      <span class="cf">else</span> y <span class="sc">%&gt;%</span> <span class="fu">steps_by_burst</span>()</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>      ),</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">rand_steps =</span> <span class="fu">map</span>(steps, <span class="cf">function</span>(x){</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(<span class="dv">5</span>)</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>      x <span class="sc">%&gt;%</span> <span class="fu">random_steps</span>(<span class="at">n_control =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">cos_ta =</span> <span class="fu">cos</span>(ta_),</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>               <span class="at">log_sl =</span> <span class="fu">log</span>(sl_))</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>      })</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="do">### create bursts whenever time between steps exceeds 8 hours and</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="do">### transform locations into steps</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>issa_bursts_summer <span class="ot">&lt;-</span> issa_track_nest <span class="sc">%&gt;%</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"summer"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">data_resamp =</span> <span class="fu">map</span>(data, <span class="cf">function</span>(x)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>      x <span class="sc">%&gt;%</span> <span class="fu">track_resample</span>(<span class="at">rate =</span> <span class="fu">hours</span>(<span class="dv">8</span>), <span class="at">tolerance =</span> <span class="fu">hours</span>(<span class="dv">1</span>))</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">steps =</span> <span class="fu">map2</span>(data,data_resamp, <span class="cf">function</span>(x,y)</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span>(<span class="fu">length</span>(<span class="fu">unique</span>(y<span class="sc">$</span>burst_))<span class="sc">==</span><span class="dv">1</span>)</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>        x <span class="sc">%&gt;%</span> <span class="fu">steps</span>()</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>      <span class="cf">else</span> y <span class="sc">%&gt;%</span> <span class="fu">steps_by_burst</span>()</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">rand_steps =</span> <span class="fu">map</span>(steps, <span class="cf">function</span>(x){</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(<span class="dv">5</span>)</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>      x <span class="sc">%&gt;%</span> <span class="fu">random_steps</span>(<span class="at">n_control =</span> <span class="dv">10</span>)</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>      })</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.65048575650619</code></pre>
 </div>
@@ -314,18 +388,434 @@ Caused by warning in `random_steps.bursted_steps_xyt()`:
 ! Some bursts contain &lt; 3 steps and will be removed
 ℹ Run `dplyr::last_dplyr_warnings()` to see the 70 remaining warnings.</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>m0_summer <span class="ot">&lt;-</span> issa_bursts_summer <span class="sc">%&gt;%</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mod =</span> <span class="fu">map</span>(rand_steps, <span class="cf">function</span>(x)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    x <span class="sc">%&gt;%</span> <span class="fu">fit_clogit</span>(case_ <span class="sc">~</span> log_sl<span class="sc">*</span>cos_ta <span class="sc">+</span> <span class="fu">strata</span>(step_id_))))</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="fu">coef</span>(m0_summer<span class="sc">$</span>mod[[<span class="dv">4</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>issa_bursts_winter <span class="ot">&lt;-</span> issa_track_nest <span class="sc">%&gt;%</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">==</span> <span class="st">"winter"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">data_resamp =</span> <span class="fu">map</span>(data, <span class="cf">function</span>(x)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>      x <span class="sc">%&gt;%</span> <span class="fu">track_resample</span>(<span class="at">rate =</span> <span class="fu">hours</span>(<span class="dv">8</span>), <span class="at">tolerance =</span> <span class="fu">hours</span>(<span class="dv">1</span>))</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">steps =</span> <span class="fu">map2</span>(data,data_resamp, <span class="cf">function</span>(x,y)</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span>(<span class="fu">length</span>(<span class="fu">unique</span>(y<span class="sc">$</span>burst_))<span class="sc">==</span><span class="dv">1</span>)</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>        x <span class="sc">%&gt;%</span> <span class="fu">steps</span>()</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>      <span class="cf">else</span> y <span class="sc">%&gt;%</span> <span class="fu">steps_by_burst</span>()</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">rand_steps =</span> <span class="fu">map</span>(steps, <span class="cf">function</span>(x){</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(<span class="dv">5</span>)</span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>      x <span class="sc">%&gt;%</span> <span class="fu">random_steps</span>(<span class="at">n_control =</span> <span class="dv">10</span>)</span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>      })</span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.49071435198262</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.64930971137248</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.56724394081064</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.68349626346525</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.68332538915642</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.62894092545827</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.59543328749614</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.5434871594889</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.62843390838056</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Steps with length 0 are present. This will lead to an error when fitting a gamma distribution. 0 step lengths are replaced with the smallest non zero step length, which is: 4.62677351093146</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: There were 68 warnings in `mutate()`.
+The first warning was:
+ℹ In argument: `rand_steps = map(...)`.
+Caused by warning in `random_steps.bursted_steps_xyt()`:
+! Some bursts contain &lt; 3 steps and will be removed
+ℹ Run `dplyr::last_dplyr_warnings()` to see the 67 remaining warnings.</code></pre>
+</div>
+</div>
+<p>Next we assign covariate data to each step.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>prcC_2020_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/prcC_2020_proj.tif"</span>))</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>mrtri3_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/mrtri3_proj.tif"</span>))</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>mrdtm_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/mrdtm_proj.tif"</span>))</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>water_dist <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/water_dist.tif"</span>))</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>lc_2010_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/lc_2010_proj.tif"</span>))</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>sm_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/sm_proj.nc"</span>))</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>nbr_proj <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(<span class="fu">here</span>(<span class="st">"data/processed/ntems_fire_nbr_proj.tif"</span>))</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(nbr_proj) <span class="ot">&lt;-</span> <span class="st">"nbr"</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>rasts <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="fu">here</span>(<span class="st">"data/processed/fire_year"</span>), </span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>                    <span class="at">pattern =</span> <span class="st">"*.tif$"</span>, </span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>                    <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>fire_year <span class="ot">&lt;-</span> <span class="fu">rast</span>(rasts)</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>issa_data_summer <span class="ot">&lt;-</span> issa_bursts_summer <span class="sc">%&gt;%</span></span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">data_covs =</span> <span class="fu">map2</span>(rand_steps, id, <span class="cf">function</span>(x,y){</span>
+<span id="cb34-17"><a href="#cb34-17" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(<span class="dv">5</span>)</span>
+<span id="cb34-18"><a href="#cb34-18" aria-hidden="true" tabindex="-1"></a>      x  <span class="sc">%&gt;%</span></span>
+<span id="cb34-19"><a href="#cb34-19" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">cos_ta =</span> <span class="fu">cos</span>(ta_),</span>
+<span id="cb34-20"><a href="#cb34-20" aria-hidden="true" tabindex="-1"></a>               <span class="at">log_sl =</span> <span class="fu">log</span>(sl_),</span>
+<span id="cb34-21"><a href="#cb34-21" aria-hidden="true" tabindex="-1"></a>               <span class="at">id =</span> y) <span class="sc">%&gt;%</span></span>
+<span id="cb34-22"><a href="#cb34-22" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(prcC_2020_proj, <span class="at">where =</span> <span class="st">"both"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-23"><a href="#cb34-23" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(mrtri3_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb34-24"><a href="#cb34-24" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(mrdtm_proj, <span class="at">where =</span> <span class="st">"both"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-25"><a href="#cb34-25" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(water_dist) <span class="sc">%&gt;%</span></span>
+<span id="cb34-26"><a href="#cb34-26" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(lc_2010_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb34-27"><a href="#cb34-27" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(nbr_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb34-28"><a href="#cb34-28" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates_var_time</span>(fire_year, <span class="at">max_time =</span> <span class="fu">years</span>(<span class="dv">1</span>),</span>
+<span id="cb34-29"><a href="#cb34-29" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">when =</span> <span class="st">"before"</span>, <span class="at">name_covar =</span> <span class="st">"fire_year"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-30"><a href="#cb34-30" aria-hidden="true" tabindex="-1"></a>        <span class="fu">drop_na</span>(ta_)</span>
+<span id="cb34-31"><a href="#cb34-31" aria-hidden="true" tabindex="-1"></a>      })</span>
+<span id="cb34-32"><a href="#cb34-32" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb34-33"><a href="#cb34-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-34"><a href="#cb34-34" aria-hidden="true" tabindex="-1"></a>issa_data_winter <span class="ot">&lt;-</span> issa_bursts_winter <span class="sc">%&gt;%</span></span>
+<span id="cb34-35"><a href="#cb34-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb34-36"><a href="#cb34-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">data_covs =</span> <span class="fu">map2</span>(rand_steps, id, <span class="cf">function</span>(x,y){</span>
+<span id="cb34-37"><a href="#cb34-37" aria-hidden="true" tabindex="-1"></a>      <span class="fu">set.seed</span>(<span class="dv">5</span>)</span>
+<span id="cb34-38"><a href="#cb34-38" aria-hidden="true" tabindex="-1"></a>      x  <span class="sc">%&gt;%</span></span>
+<span id="cb34-39"><a href="#cb34-39" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">cos_ta =</span> <span class="fu">cos</span>(ta_),</span>
+<span id="cb34-40"><a href="#cb34-40" aria-hidden="true" tabindex="-1"></a>               <span class="at">log_sl =</span> <span class="fu">log</span>(sl_),</span>
+<span id="cb34-41"><a href="#cb34-41" aria-hidden="true" tabindex="-1"></a>               <span class="at">id =</span> y) <span class="sc">%&gt;%</span></span>
+<span id="cb34-42"><a href="#cb34-42" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(prcC_2020_proj, <span class="at">where =</span> <span class="st">"both"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-43"><a href="#cb34-43" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(mrtri3_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb34-44"><a href="#cb34-44" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(mrdtm_proj, <span class="at">where =</span> <span class="st">"both"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-45"><a href="#cb34-45" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(water_dist) <span class="sc">%&gt;%</span></span>
+<span id="cb34-46"><a href="#cb34-46" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(lc_2010_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb34-47"><a href="#cb34-47" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates</span>(nbr_proj) <span class="sc">%&gt;%</span></span>
+<span id="cb34-48"><a href="#cb34-48" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates_var_time</span>(fire_year, <span class="at">max_time =</span> <span class="fu">years</span>(<span class="dv">1</span>),</span>
+<span id="cb34-49"><a href="#cb34-49" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">name_covar =</span> <span class="st">"fire_year"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-50"><a href="#cb34-50" aria-hidden="true" tabindex="-1"></a>        <span class="fu">extract_covariates_var_time</span>(sm_proj, <span class="at">max_time =</span> <span class="fu">days</span>(<span class="dv">2</span>),</span>
+<span id="cb34-51"><a href="#cb34-51" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">name_covar =</span> <span class="st">"snow_depth"</span>,</span>
+<span id="cb34-52"><a href="#cb34-52" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">where =</span> <span class="st">"start"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-53"><a href="#cb34-53" aria-hidden="true" tabindex="-1"></a>        <span class="fu">drop_na</span>(ta_)</span>
+<span id="cb34-54"><a href="#cb34-54" aria-hidden="true" tabindex="-1"></a>      })</span>
+<span id="cb34-55"><a href="#cb34-55" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Next we will collapse each muskox-specific dataset into a combined dataset for each season. We will assign a new ID to each muskox burst and calculate some new covariates for the models. We will also examine the covariates for any correlation.<br>
+</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>issa_data_summer_comb <span class="ot">&lt;-</span> <span class="fu">list_rbind</span>(issa_data_summer<span class="sc">$</span>data_covs) <span class="sc">%&gt;%</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(id, step_id_) <span class="sc">%&gt;%</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">strat_id =</span> <span class="fu">cur_group_id</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">log_water_dist =</span> <span class="fu">log</span>(layer<span class="sc">/</span><span class="dv">30</span><span class="sc">+</span><span class="dv">1</span>),</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">water =</span> <span class="fu">ifelse</span>(cover <span class="sc">==</span> <span class="st">"Water"</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">open_land =</span> <span class="fu">ifelse</span>(cover <span class="sc">%in%</span> </span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>                              <span class="fu">c</span>(<span class="st">"Temperate or sub-polar shrubland"</span>,</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Temperate or sub-polar grassland"</span>)</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>                            ,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">forest =</span> <span class="fu">ifelse</span>(cover <span class="sc">%in%</span> </span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a>                              <span class="fu">c</span>(<span class="st">"Temperate or sub-polar needleleaf forest"</span>,</span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Sub-polar taiga needleleaf forest"</span>,</span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Temperate or sub-polar broadleaf deciduous forest"</span>,</span>
+<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Mixed forest"</span>)</span>
+<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>                            ,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>         <span class="at">nbr =</span> <span class="fu">replace_na</span>(nbr,<span class="dv">0</span>),</span>
+<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a>         <span class="at">nbr_low =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(nbr)<span class="sc">|</span>nbr<span class="sc">&lt;=</span><span class="dv">27</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a>         <span class="at">nbr_moderate =</span> <span class="fu">ifelse</span>(nbr<span class="sc">&gt;</span><span class="dv">27</span><span class="sc">&amp;</span>nbr<span class="sc">&lt;=</span><span class="dv">66</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a>         <span class="at">nbr_high =</span> <span class="fu">ifelse</span>(nbr<span class="sc">&gt;</span><span class="dv">66</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_10 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&lt;=</span><span class="dv">10</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_20 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&gt;</span><span class="dv">10</span><span class="sc">&amp;</span>fire_year<span class="sc">&lt;=</span><span class="dv">20</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-23"><a href="#cb35-23" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_30 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&gt;</span><span class="dv">20</span><span class="sc">&amp;</span>fire_year<span class="sc">&lt;=</span><span class="dv">30</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-24"><a href="#cb35-24" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_40 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&gt;</span><span class="dv">30</span><span class="sc">&amp;</span>fire_year<span class="sc">&lt;=</span><span class="dv">40</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb35-25"><a href="#cb35-25" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_10_low =</span> fire_10<span class="sc">*</span>nbr_low,</span>
+<span id="cb35-26"><a href="#cb35-26" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_10_mod =</span> fire_10<span class="sc">*</span>nbr_moderate,</span>
+<span id="cb35-27"><a href="#cb35-27" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_10_high =</span> fire_10<span class="sc">*</span>nbr_high,</span>
+<span id="cb35-28"><a href="#cb35-28" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_20_low =</span> fire_20<span class="sc">*</span>nbr_low,</span>
+<span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_20_mod =</span> fire_20<span class="sc">*</span>nbr_moderate,</span>
+<span id="cb35-30"><a href="#cb35-30" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_20_high =</span> fire_20<span class="sc">*</span>nbr_high)</span>
+<span id="cb35-31"><a href="#cb35-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-32"><a href="#cb35-32" aria-hidden="true" tabindex="-1"></a>issa_data_summer_comb <span class="sc">%&gt;%</span></span>
+<span id="cb35-33"><a href="#cb35-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(log_sl, cos_ta, scanfi_prcC_end, mrdtm,</span>
+<span id="cb35-34"><a href="#cb35-34" aria-hidden="true" tabindex="-1"></a>         fire_year, open_land, forest) <span class="sc">%&gt;%</span></span>
+<span id="cb35-35"><a href="#cb35-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cor</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>       log_sl        cos_ta log_sl:cos_ta 
-  -0.04405873   -0.41135873    0.07256775 </code></pre>
+<pre><code>                      log_sl       cos_ta scanfi_prcC_end       mrdtm
+log_sl           1.000000000  0.015039480     0.001566813  0.01450998
+cos_ta           0.015039480  1.000000000     0.003245904  0.02343300
+scanfi_prcC_end  0.001566813  0.003245904     1.000000000  0.04423831
+mrdtm            0.014509977  0.023432998     0.044238310  1.00000000
+fire_year        0.045986113  0.015558266     0.361686670  0.10893975
+open_land       -0.045049759 -0.012236711    -0.295894068  0.02545177
+forest           0.013036538  0.003690669     0.326216883 -0.14416072
+                  fire_year   open_land       forest
+log_sl           0.04598611 -0.04504976  0.013036538
+cos_ta           0.01555827 -0.01223671  0.003690669
+scanfi_prcC_end  0.36168667 -0.29589407  0.326216883
+mrdtm            0.10893975  0.02545177 -0.144160721
+fire_year        1.00000000 -0.69815278  0.592775670
+open_land       -0.69815278  1.00000000 -0.872079248
+forest           0.59277567 -0.87207925  1.000000000</code></pre>
 </div>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>issa_data_winter_comb <span class="ot">&lt;-</span> <span class="fu">list_rbind</span>(issa_data_winter<span class="sc">$</span>data_covs) <span class="sc">%&gt;%</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(id, step_id_) <span class="sc">%&gt;%</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">strat_id =</span> <span class="fu">cur_group_id</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">log_water_dist =</span> <span class="fu">log</span>(layer<span class="sc">/</span><span class="dv">100</span><span class="sc">+</span><span class="dv">1</span>),</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>         <span class="do">### only 3-4 potentital steps in fires aged &lt;10 years</span></span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>         <span class="do">### also not enough 1-20 year fires for separate groups based on nbr</span></span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_10_20 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&lt;=</span><span class="dv">20</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_30 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&gt;</span><span class="dv">20</span><span class="sc">&amp;</span>fire_year<span class="sc">&lt;=</span><span class="dv">30</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">fire_40 =</span> <span class="fu">ifelse</span>(fire_year<span class="sc">&gt;</span><span class="dv">30</span><span class="sc">&amp;</span>fire_year<span class="sc">&lt;=</span><span class="dv">40</span>,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">dtm_diff =</span> mrdtm_end <span class="sc">-</span> mrdtm_start,</span>
+<span id="cb37-12"><a href="#cb37-12" aria-hidden="true" tabindex="-1"></a>         <span class="at">open_land =</span> <span class="fu">ifelse</span>(cover <span class="sc">%in%</span> </span>
+<span id="cb37-13"><a href="#cb37-13" aria-hidden="true" tabindex="-1"></a>                              <span class="fu">c</span>(<span class="st">"Temperate or sub-polar shrubland"</span>,</span>
+<span id="cb37-14"><a href="#cb37-14" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Temperate or sub-polar grassland"</span>)</span>
+<span id="cb37-15"><a href="#cb37-15" aria-hidden="true" tabindex="-1"></a>                            ,<span class="dv">1</span>,<span class="dv">0</span>),</span>
+<span id="cb37-16"><a href="#cb37-16" aria-hidden="true" tabindex="-1"></a>         <span class="at">forest =</span> <span class="fu">ifelse</span>(cover <span class="sc">%in%</span> </span>
+<span id="cb37-17"><a href="#cb37-17" aria-hidden="true" tabindex="-1"></a>                              <span class="fu">c</span>(<span class="st">"Temperate or sub-polar needleleaf forest"</span>,</span>
+<span id="cb37-18"><a href="#cb37-18" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Sub-polar taiga needleleaf forest"</span>,</span>
+<span id="cb37-19"><a href="#cb37-19" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Temperate or sub-polar broadleaf deciduous forest"</span>,</span>
+<span id="cb37-20"><a href="#cb37-20" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"Mixed forest"</span>)</span>
+<span id="cb37-21"><a href="#cb37-21" aria-hidden="true" tabindex="-1"></a>                            ,<span class="dv">1</span>,<span class="dv">0</span>))</span>
+<span id="cb37-22"><a href="#cb37-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-23"><a href="#cb37-23" aria-hidden="true" tabindex="-1"></a>issa_data_winter_comb <span class="sc">%&gt;%</span></span>
+<span id="cb37-24"><a href="#cb37-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(log_sl, cos_ta, scanfi_prcC_end, mrdtm, </span>
+<span id="cb37-25"><a href="#cb37-25" aria-hidden="true" tabindex="-1"></a>         fire_year, open_land, </span>
+<span id="cb37-26"><a href="#cb37-26" aria-hidden="true" tabindex="-1"></a>         forest, snow_depth) <span class="sc">%&gt;%</span></span>
+<span id="cb37-27"><a href="#cb37-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cor</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                      log_sl       cos_ta scanfi_prcC_end       mrdtm
+log_sl           1.000000000  0.011075010     -0.02030951  0.07092959
+cos_ta           0.011075010  1.000000000      0.01673297  0.01410999
+scanfi_prcC_end -0.020309514  0.016732972      1.00000000  0.08745243
+mrdtm            0.070929595  0.014109988      0.08745243  1.00000000
+fire_year       -0.020095886 -0.022657588     -0.01490196  0.05368443
+open_land        0.049655154  0.001748410     -0.02722456  0.08505163
+forest          -0.063572861 -0.003636107      0.09606280 -0.10148841
+snow_depth       0.007521049 -0.001104784      0.17460700  0.23116577
+                  fire_year   open_land       forest   snow_depth
+log_sl          -0.02009589  0.04965515 -0.063572861  0.007521049
+cos_ta          -0.02265759  0.00174841 -0.003636107 -0.001104784
+scanfi_prcC_end -0.01490196 -0.02722456  0.096062804  0.174607000
+mrdtm            0.05368443  0.08505163 -0.101488413  0.231165772
+fire_year        1.00000000 -0.10915844  0.065584120 -0.053641622
+open_land       -0.10915844  1.00000000 -0.666750553  0.072652237
+forest           0.06558412 -0.66675055  1.000000000 -0.113143434
+snow_depth      -0.05364162  0.07265224 -0.113143434  1.000000000</code></pre>
+</div>
+</div>
+<p>Lastly, we will fit models for the summer and winter datasets separately. Models are fit using the ISSA method that allows for random effects. This way we can automatically pool estimates across individuals to come up with a population-level estimate for each covariate.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co"># m0_summer_2step &lt;- Ts.estim(case_ ~ scale(log_sl)*scale(cos_ta) + </span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(scanfi_prcC_end) +</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(mrdtm) +</span></span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a><span class="co">#                               # scale(dtm_diff) +</span></span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(log_water_dist) +</span></span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a><span class="co">#                               open_land + </span></span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(log_fire_year) +</span></span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a><span class="co">#                               strata(strat_id) +</span></span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a><span class="co">#                               cluster(id),</span></span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a><span class="co">#                             data = issa_data_summer_comb)</span></span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a><span class="co"># m0_summer_2step</span></span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>m0_summer_glmmfit <span class="ot">&lt;-</span> <span class="fu">glmmTMB</span>(case_ <span class="sc">~</span> <span class="sc">-</span><span class="dv">1</span> <span class="sc">+</span> <span class="fu">scale</span>(log_sl)<span class="sc">*</span><span class="fu">scale</span>(cos_ta) <span class="sc">+</span> </span>
+<span id="cb39-14"><a href="#cb39-14" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(scanfi_prcC_end) <span class="sc">+</span></span>
+<span id="cb39-15"><a href="#cb39-15" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(mrdtm) <span class="sc">+</span></span>
+<span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>                            <span class="co"># scale(dtm_diff) +</span></span>
+<span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(log_water_dist) <span class="sc">+</span></span>
+<span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>                            water <span class="sc">+</span></span>
+<span id="cb39-19"><a href="#cb39-19" aria-hidden="true" tabindex="-1"></a>                            fire_10_low <span class="sc">+</span></span>
+<span id="cb39-20"><a href="#cb39-20" aria-hidden="true" tabindex="-1"></a>                            fire_10_mod <span class="sc">+</span></span>
+<span id="cb39-21"><a href="#cb39-21" aria-hidden="true" tabindex="-1"></a>                            fire_10_high <span class="sc">+</span></span>
+<span id="cb39-22"><a href="#cb39-22" aria-hidden="true" tabindex="-1"></a>                            fire_20_low <span class="sc">+</span></span>
+<span id="cb39-23"><a href="#cb39-23" aria-hidden="true" tabindex="-1"></a>                            fire_20_mod <span class="sc">+</span></span>
+<span id="cb39-24"><a href="#cb39-24" aria-hidden="true" tabindex="-1"></a>                            fire_20_high <span class="sc">+</span></span>
+<span id="cb39-25"><a href="#cb39-25" aria-hidden="true" tabindex="-1"></a>                            fire_30 <span class="sc">+</span></span>
+<span id="cb39-26"><a href="#cb39-26" aria-hidden="true" tabindex="-1"></a>                            fire_40 <span class="sc">+</span></span>
+<span id="cb39-27"><a href="#cb39-27" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">1</span><span class="sc">|</span>strat_id) <span class="sc">+</span></span>
+<span id="cb39-28"><a href="#cb39-28" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(log_sl)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-29"><a href="#cb39-29" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(cos_ta)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-30"><a href="#cb39-30" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(log_sl)<span class="sc">:</span><span class="fu">scale</span>(cos_ta)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-31"><a href="#cb39-31" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(scanfi_prcC_end)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-32"><a href="#cb39-32" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(mrdtm)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-33"><a href="#cb39-33" aria-hidden="true" tabindex="-1"></a>                            <span class="co"># (0 + scale(dtm_diff)|id) +</span></span>
+<span id="cb39-34"><a href="#cb39-34" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(log_water_dist)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-35"><a href="#cb39-35" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> water<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-36"><a href="#cb39-36" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_10_low<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-37"><a href="#cb39-37" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_10_mod<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-38"><a href="#cb39-38" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_10_high<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-39"><a href="#cb39-39" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_20_low<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-40"><a href="#cb39-40" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_20_mod<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-41"><a href="#cb39-41" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_20_high<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-42"><a href="#cb39-42" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_30<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb39-43"><a href="#cb39-43" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_40<span class="sc">|</span>id), </span>
+<span id="cb39-44"><a href="#cb39-44" aria-hidden="true" tabindex="-1"></a>                          <span class="at">family =</span> poisson,</span>
+<span id="cb39-45"><a href="#cb39-45" aria-hidden="true" tabindex="-1"></a>                          <span class="at">data =</span> issa_data_summer_comb,</span>
+<span id="cb39-46"><a href="#cb39-46" aria-hidden="true" tabindex="-1"></a>                          <span class="at">map=</span><span class="fu">list</span>(<span class="at">theta=</span><span class="fu">factor</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="dv">1</span><span class="sc">:</span><span class="dv">15</span>))),</span>
+<span id="cb39-47"><a href="#cb39-47" aria-hidden="true" tabindex="-1"></a>                          <span class="at">start=</span><span class="fu">list</span>(<span class="at">theta=</span><span class="fu">c</span>(<span class="fu">log</span>(<span class="fl">1e3</span>),<span class="fu">rep</span>(<span class="dv">0</span>,<span class="dv">15</span>))))</span>
+<span id="cb39-48"><a href="#cb39-48" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m0_summer_glmmfit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: poisson  ( log )
+Formula:          
+case_ ~ -1 + scale(log_sl) * scale(cos_ta) + scale(scanfi_prcC_end) +  
+    scale(mrdtm) + scale(log_water_dist) + water + fire_10_low +  
+    fire_10_mod + fire_10_high + fire_20_low + fire_20_mod +  
+    fire_20_high + fire_30 + fire_40 + (1 | strat_id) + (0 +  
+    scale(log_sl) | id) + (0 + scale(cos_ta) | id) + (0 + scale(log_sl):scale(cos_ta) |  
+    id) + (0 + scale(scanfi_prcC_end) | id) + (0 + scale(mrdtm) |  
+    id) + (0 + scale(log_water_dist) | id) + (0 + water | id) +  
+    (0 + fire_10_low | id) + (0 + fire_10_mod | id) + (0 + fire_10_high |  
+    id) + (0 + fire_20_low | id) + (0 + fire_20_mod | id) + (0 +  
+    fire_20_high | id) + (0 + fire_30 | id) + (0 + fire_40 |      id)
+Data: issa_data_summer_comb
+
+     AIC      BIC   logLik deviance df.resid 
+134424.5 134700.1 -67182.2 134364.5    72202 
+
+Random effects:
+
+Conditional model:
+ Groups   Name                        Variance  Std.Dev. 
+ strat_id (Intercept)                 1.000e+06 1.000e+03
+ id       scale(log_sl)               2.211e-08 1.487e-04
+ id.1     scale(cos_ta)               9.732e-11 9.865e-06
+ id.2     scale(log_sl):scale(cos_ta) 7.179e-04 2.679e-02
+ id.3     scale(scanfi_prcC_end)      2.401e-10 1.549e-05
+ id.4     scale(mrdtm)                1.351e-02 1.162e-01
+ id.5     scale(log_water_dist)       3.692e-09 6.076e-05
+ id.6     water                       4.162e-08 2.040e-04
+ id.7     fire_10_low                 1.334e-06 1.155e-03
+ id.8     fire_10_mod                 1.872e-01 4.326e-01
+ id.9     fire_10_high                2.676e-02 1.636e-01
+ id.10    fire_20_low                 1.108e-09 3.328e-05
+ id.11    fire_20_mod                 1.626e-10 1.275e-05
+ id.12    fire_20_high                3.375e-02 1.837e-01
+ id.13    fire_30                     5.711e-09 7.557e-05
+ id.14    fire_40                     5.861e-10 2.421e-05
+Number of obs: 72232, groups:  strat_id, 6568; id, 7
+
+Conditional model:
+                             Estimate Std. Error z value Pr(&gt;|z|)    
+scale(log_sl)                0.042373   0.013434   3.154  0.00161 ** 
+scale(cos_ta)                0.008794   0.013245   0.664  0.50673    
+scale(scanfi_prcC_end)      -0.036065   0.017518  -2.059  0.03952 *  
+scale(mrdtm)                -0.108855   0.056756  -1.918  0.05512 .  
+scale(log_water_dist)        0.150706   0.051014   2.954  0.00313 ** 
+water                       -1.331745   0.219542  -6.066 1.31e-09 ***
+fire_10_low                  0.435325   0.178658   2.437  0.01482 *  
+fire_10_mod                  1.002848   0.234900   4.269 1.96e-05 ***
+fire_10_high                 1.294692   0.121281  10.675  &lt; 2e-16 ***
+fire_20_low                  0.563758   0.196579   2.868  0.00413 ** 
+fire_20_mod                  0.922816   0.151244   6.102 1.05e-09 ***
+fire_20_high                 1.384242   0.203461   6.803 1.02e-11 ***
+fire_30                      0.062175   0.161876   0.384  0.70091    
+fire_40                     -0.285749   0.136408  -2.095  0.03619 *  
+scale(log_sl):scale(cos_ta)  0.114390   0.017570   6.510 7.49e-11 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(issa_data_summer_comb, <span class="fu">here</span>(<span class="st">"data/processed/issa_data_summer_comb.rds"</span>))</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(m0_summer_glmmfit, <span class="fu">here</span>(<span class="st">"output/m0_summer_glmmfit.rds"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># m0_winter_2step &lt;- Ts.estim(case_ ~ scale(log_sl)*scale(cos_ta) + </span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(scanfi_prcC_end) +</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(mrdtm) +</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(dtm_diff) +</span></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(log_water_dist) +</span></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a><span class="co">#                               open_land + </span></span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(snow_depth):scale(log_sl) +</span></span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a><span class="co">#                               scale(snow_depth):scale(dtm_diff) +</span></span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a><span class="co">#                               # scale(log_fire_year) +</span></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a><span class="co">#                               strata(strat_id) +</span></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a><span class="co">#                               cluster(id),</span></span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a><span class="co">#                             data = issa_data_winter_comb)</span></span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a><span class="co"># m0_winter_2step</span></span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>m0_winter_glmmfit <span class="ot">&lt;-</span> <span class="fu">glmmTMB</span>(case_ <span class="sc">~</span> <span class="sc">-</span><span class="dv">1</span> <span class="sc">+</span> <span class="fu">scale</span>(log_sl)<span class="sc">*</span><span class="fu">scale</span>(cos_ta) <span class="sc">+</span> </span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(scanfi_prcC_end) <span class="sc">+</span></span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(mrdtm) <span class="sc">+</span></span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>                            <span class="co"># scale(dtm_diff) +</span></span>
+<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(log_water_dist) <span class="sc">+</span></span>
+<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a>                            <span class="co"># open_land +</span></span>
+<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a>                            fire_10_20 <span class="sc">+</span></span>
+<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>                            fire_30 <span class="sc">+</span></span>
+<span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a>                            fire_40 <span class="sc">+</span></span>
+<span id="cb42-24"><a href="#cb42-24" aria-hidden="true" tabindex="-1"></a>                            <span class="fu">scale</span>(snow_depth)<span class="sc">:</span><span class="fu">scale</span>(log_sl) <span class="sc">+</span></span>
+<span id="cb42-25"><a href="#cb42-25" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">1</span><span class="sc">|</span>strat_id) <span class="sc">+</span></span>
+<span id="cb42-26"><a href="#cb42-26" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(log_sl)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-27"><a href="#cb42-27" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(cos_ta)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-28"><a href="#cb42-28" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(log_sl)<span class="sc">:</span><span class="fu">scale</span>(cos_ta)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-29"><a href="#cb42-29" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(scanfi_prcC_end)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-30"><a href="#cb42-30" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(mrdtm)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-31"><a href="#cb42-31" aria-hidden="true" tabindex="-1"></a>                            <span class="co"># (0 + scale(dtm_diff)|id) +</span></span>
+<span id="cb42-32"><a href="#cb42-32" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(log_water_dist)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-33"><a href="#cb42-33" aria-hidden="true" tabindex="-1"></a>                            <span class="co"># (0 + open_land|id) +</span></span>
+<span id="cb42-34"><a href="#cb42-34" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> <span class="fu">scale</span>(snow_depth)<span class="sc">:</span><span class="fu">scale</span>(log_sl)<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-35"><a href="#cb42-35" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_10_20<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-36"><a href="#cb42-36" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_30<span class="sc">|</span>id) <span class="sc">+</span></span>
+<span id="cb42-37"><a href="#cb42-37" aria-hidden="true" tabindex="-1"></a>                            (<span class="dv">0</span> <span class="sc">+</span> fire_40<span class="sc">|</span>id), </span>
+<span id="cb42-38"><a href="#cb42-38" aria-hidden="true" tabindex="-1"></a>                          <span class="at">family =</span> poisson,</span>
+<span id="cb42-39"><a href="#cb42-39" aria-hidden="true" tabindex="-1"></a>                          <span class="at">data =</span> issa_data_winter_comb,</span>
+<span id="cb42-40"><a href="#cb42-40" aria-hidden="true" tabindex="-1"></a>                          <span class="at">map=</span><span class="fu">list</span>(<span class="at">theta=</span><span class="fu">factor</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>))),</span>
+<span id="cb42-41"><a href="#cb42-41" aria-hidden="true" tabindex="-1"></a>                          <span class="at">start=</span><span class="fu">list</span>(<span class="at">theta=</span><span class="fu">c</span>(<span class="fu">log</span>(<span class="fl">1e3</span>),<span class="fu">rep</span>(<span class="dv">0</span>,<span class="dv">10</span>))))</span>
+<span id="cb42-42"><a href="#cb42-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-43"><a href="#cb42-43" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m0_winter_glmmfit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: poisson  ( log )
+Formula:          
+case_ ~ -1 + scale(log_sl) * scale(cos_ta) + scale(scanfi_prcC_end) +  
+    scale(mrdtm) + scale(log_water_dist) + fire_10_20 + fire_30 +  
+    fire_40 + scale(snow_depth):scale(log_sl) + (1 | strat_id) +  
+    (0 + scale(log_sl) | id) + (0 + scale(cos_ta) | id) + (0 +  
+    scale(log_sl):scale(cos_ta) | id) + (0 + scale(scanfi_prcC_end) |  
+    id) + (0 + scale(mrdtm) | id) + (0 + scale(log_water_dist) |  
+    id) + (0 + scale(snow_depth):scale(log_sl) | id) + (0 + fire_10_20 |  
+    id) + (0 + fire_30 | id) + (0 + fire_40 | id)
+Data: issa_data_winter_comb
+
+     AIC      BIC   logLik deviance df.resid 
+114268.7 114449.5 -57114.4 114228.7    62162 
+
+Random effects:
+
+Conditional model:
+ Groups   Name                            Variance  Std.Dev. 
+ strat_id (Intercept)                     1.000e+06 1.000e+03
+ id       scale(log_sl)                   1.836e-02 1.355e-01
+ id.1     scale(cos_ta)                   3.722e-03 6.101e-02
+ id.2     scale(log_sl):scale(cos_ta)     9.177e-09 9.580e-05
+ id.3     scale(scanfi_prcC_end)          1.084e-02 1.041e-01
+ id.4     scale(mrdtm)                    1.411e-02 1.188e-01
+ id.5     scale(log_water_dist)           3.729e-08 1.931e-04
+ id.6     scale(snow_depth):scale(log_sl) 6.840e-02 2.615e-01
+ id.7     fire_10_20                      1.592e-07 3.990e-04
+ id.8     fire_30                         3.973e-08 1.993e-04
+ id.9     fire_40                         1.233e-08 1.111e-04
+Number of obs: 62182, groups:  strat_id, 5663; id, 10
+
+Conditional model:
+                                Estimate Std. Error z value Pr(&gt;|z|)    
+scale(log_sl)                   -0.02598    0.04975  -0.522  0.60147    
+scale(cos_ta)                   -0.04345    0.02579  -1.685  0.09203 .  
+scale(scanfi_prcC_end)          -0.02744    0.05051  -0.543  0.58694    
+scale(mrdtm)                    -0.25857    0.05636  -4.588 4.48e-06 ***
+scale(log_water_dist)            0.30317    0.20744   1.462  0.14387    
+fire_10_20                      -0.77435    0.43035  -1.799  0.07196 .  
+fire_30                         -1.86872    0.80586  -2.319  0.02040 *  
+fire_40                         -0.21342    0.24347  -0.877  0.38072    
+scale(log_sl):scale(cos_ta)      0.11428    0.01436   7.960 1.72e-15 ***
+scale(log_sl):scale(snow_depth) -0.24217    0.08706  -2.782  0.00541 ** 
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(issa_data_winter_comb, <span class="fu">here</span>(<span class="st">"data/processed/issa_data_winter_comb.rds"</span>))</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(m0_winter_glmmfit, <span class="fu">here</span>(<span class="st">"output/m0_winter_glmmfit.rds"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

@@ -172,6 +172,7 @@ lookup <- musk_collar_seas %>%
 #                            grid=sp_pixels[[lookup$group[i]]])
 # }
 # saveRDS(musk_bb, here("data/processed/musk_bb.rds"))
+
 musk_bb <- readRDS(here("data/processed/musk_bb.rds"))
 
 ```

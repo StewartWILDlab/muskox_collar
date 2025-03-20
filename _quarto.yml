@@ -10,9 +10,10 @@ website:
     style: "docked"
     search: false
     contents: 
-      - quarto/data_exploration.qmd
-      - quarto/movement_patterns.qmd
-      - quarto/home_range.qmd
-      - quarto/annual_range.qmd
-      - quarto/seasonal_range.qmd
-      - quarto/seasonal_range_mod.qmd
+      - quarto/01_data_exploration.qmd
+      - quarto/02_movement_patterns.qmd
+      - quarto/03_home_range.qmd
+      - quarto/04_annual_range.qmd
+      - quarto/05_seasonal_range.qmd
+      - quarto/06_seasonal_range_mod.qmd      
+      - quarto/step_selection_functions.qmd

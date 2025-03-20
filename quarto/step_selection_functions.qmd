@@ -56,6 +56,13 @@ Next let's look at some of the relationships between the spatial data we'll be u
 #| out-width: 100%
 #| layout-ncol: 1
 
+# nbr_proj <- terra::rast(here("data/processed/ntems_fire_nbr_proj.tif"))
+# # nbr_cat <- nbr_proj
+# # nbr_cat[nbr_proj>66] <- 3
+# # nbr_cat[nbr_proj<=66&nbr_proj>27] <- 2
+# # nbr_cat[nbr_proj<=27] <- 1
+# # plot(nbr_cat)
+
 ggplot() +
   geom_sf(data = musk_collar_season) +
   geom_sf(data = fire_data_subset %>% 
@@ -153,6 +160,10 @@ head(issa_track_nest)
 
 ```
 
+## ISSA Models
+
+Lets prepare the data for use in ISSA. We'll first resample the data to ensure each step is 8 hours in length. Next we will convert groups of steps into bursts, where a new burst occurs when the time between subsequent steps is greater than 8 hours. Lastly, we will sample random steps for each observed step so that we can compare available and used locations. We use the recommended sample size of 10 for available steps, but will test the robustness of these models by increasing the sample size once we have an appropriate model.
+
 ```{r}
 #| label: create_bursts
 #| dependson: "prep_data"
@@ -196,7 +207,7 @@ issa_bursts_winter <- issa_track_nest %>%
 
 ```
 
-There are some instances where there was a 0 m difference between successive step lengths. In these instances, the random step algorithm can't estimate a turning angle because it doesn't have three points that make up a triangle. Consequently, these instances will need to be removed. Below, we removed any point with an NA turning angle (71 instances). We also assign covariate data to each step.
+Next we assign covariate data to each step.
 
 ```{r}
 #| label: assign_covariates
@@ -210,7 +221,7 @@ lc_2010_proj <- terra::rast(here("data/processed/lc_2010_proj.tif"))
 sm_proj <- terra::rast(here("data/processed/sm_proj.nc"))
 nbr_proj <- terra::rast(here("data/processed/ntems_fire_nbr_proj.tif"))
 names(nbr_proj) <- "nbr"
-rasts <- list.files("data/processed/fire_year", 
+rasts <- list.files(here("data/processed/fire_year"), 
                     pattern = "*.tif$", 
                     full.names = TRUE)
 fire_year <- rast(rasts)
@@ -259,21 +270,28 @@ issa_data_winter <- issa_bursts_winter %>%
   )
 ```
 
-Next let's create models for each muskox. We'll start simple using a model with just step length, turning angle, and forest biomass:\
+Next we will collapse each muskox-specific dataset into a combined dataset for each season. We will assign a new ID to each muskox burst and calculate some new covariates for the models. We will also examine the covariates for any correlation. \
 
 ```{r}
-#| label: summer_models
+#| label: combined_data
 #| dependson: "assign_covariates"
 
 issa_data_summer_comb <- list_rbind(issa_data_summer$data_covs) %>%
   group_by(id, step_id_) %>%
   mutate(strat_id = cur_group_id()) %>%
   ungroup() %>%
-  group_by(id) %>%
-  mutate(dtm_centered = mrdtm_end - mean(mrdtm_end)) %>%
-  ungroup() %>%
-  mutate(log_water_dist = log(layer/100+1),
-         dtm_diff = mrdtm_end - mrdtm_start,
+  mutate(log_water_dist = log(layer/30+1),
+         water = ifelse(cover == "Water",1,0),
+         open_land = ifelse(cover %in% 
+                              c("Temperate or sub-polar shrubland",
+                                "Temperate or sub-polar grassland")
+                            ,1,0),
+         forest = ifelse(cover %in% 
+                              c("Temperate or sub-polar needleleaf forest",
+                                "Sub-polar taiga needleleaf forest",
+                                "Temperate or sub-polar broadleaf deciduous forest",
+                                "Mixed forest")
+                            ,1,0),
          nbr = replace_na(nbr,0),
          nbr_low = ifelse(is.na(nbr)|nbr<=27,1,0),
          nbr_moderate = ifelse(nbr>27&nbr<=66,1,0),
@@ -287,80 +305,12 @@ issa_data_summer_comb <- list_rbind(issa_data_summer$data_covs) %>%
          fire_10_high = fire_10*nbr_high,
          fire_20_low = fire_20*nbr_low,
          fire_20_mod = fire_20*nbr_moderate,
-         fire_20_high = fire_20*nbr_high,
-         open_land = ifelse(cover %in% 
-                              c("Temperate or sub-polar shrubland",
-                                "Temperate or sub-polar grassland")
-                            ,1,0),
-         forest = ifelse(cover %in% 
-                              c("Temperate or sub-polar needleleaf forest",
-                                "Sub-polar taiga needleleaf forest",
-                                "Temperate or sub-polar broadleaf deciduous forest",
-                                "Mixed forest")
-                            ,1,0))
+         fire_20_high = fire_20*nbr_high)
 
 issa_data_summer_comb %>%
-  select(log_sl, cos_ta, scanfi_prcC_end, mrdtm, dtm_diff, dtm_centered,
-         log_fire_dist, log_fire_year, open_land, forest) %>%
+  select(log_sl, cos_ta, scanfi_prcC_end, mrdtm,
+         fire_year, open_land, forest) %>%
   cor()
-
-m0_summer_2step <- Ts.estim(case_ ~ scale(log_sl)*scale(cos_ta) + 
-                              scale(scanfi_prcC_end) +
-                              scale(mrdtm) +
-                              scale(dtm_diff) +
-                              scale(log_water_dist) +
-                              open_land + 
-                              scale(log_fire_year) +
-                              strata(strat_id) +
-                              cluster(id),
-                            data = issa_data_summer_comb)
-m0_summer_2step
-
-m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
-                            scale(scanfi_prcC_end) +
-                            scale(mrdtm) +
-                            # scale(dtm_diff) +
-                            scale(log_water_dist) +
-                            # open_land +
-                            fire_10_low +
-                            fire_10_mod +
-                            fire_10_high +
-                            fire_20_low +
-                            fire_20_mod +
-                            fire_20_high +
-                            fire_30 +
-                            fire_40 +
-                            (1|strat_id) +
-                            (0 + scale(log_sl)|id) +
-                            (0 + scale(cos_ta)|id) +
-                            (0 + scale(log_sl):scale(cos_ta)|id) +
-                            (0 + scale(scanfi_prcC_end)|id) +
-                            (0 + scale(mrdtm)|id) +
-                            # (0 + scale(dtm_diff)|id) +
-                            (0 + scale(log_water_dist)|id) +
-                            # (0 + open_land|id) +
-                            (0 + fire_10_low|id) +
-                            (0 + fire_10_mod|id) +
-                            (0 + fire_10_high|id) +
-                            (0 + fire_20_low|id) +
-                            (0 + fire_20_mod|id) +
-                            (0 + fire_20_high|id) +
-                            (0 + fire_30|id) +
-                            (0 + fire_40|id), 
-                          family = poisson,
-                          data = issa_data_summer_comb,
-                          map=list(theta=factor(c(NA,1:15))),
-                          start=list(theta=c(log(1e3),rep(0,15))))
-summary(m0_summer_glmmfit)
-
-saveRDS(issa_data_summer_comb, here("data/processed/issa_data_summer_comb.rds"))
-saveRDS(m0_summer_glmmfit, here("output/m0_summer_glmmfit.rds"))
-
-```
-
-```{r}
-#| label: winter_models
-#| dependson: "assign_covariates"
 
 issa_data_winter_comb <- list_rbind(issa_data_winter$data_covs) %>%
   group_by(id, step_id_) %>%
@@ -386,24 +336,91 @@ issa_data_winter_comb <- list_rbind(issa_data_winter$data_covs) %>%
 
 issa_data_winter_comb %>%
   select(log_sl, cos_ta, scanfi_prcC_end, mrdtm, 
-         log_fire_dist, log_fire_year, open_land, 
-         forest, snow_depth, dtm_diff) %>%
+         fire_year, open_land, 
+         forest, snow_depth) %>%
   cor()
 
-  
-m0_winter_2step <- Ts.estim(case_ ~ scale(log_sl)*scale(cos_ta) + 
-                              scale(scanfi_prcC_end) +
-                              scale(mrdtm) +
-                              scale(dtm_diff) +
-                              scale(log_water_dist) +
-                              open_land + 
-                              scale(snow_depth):scale(log_sl) +
-                              scale(snow_depth):scale(dtm_diff) +
-                              # scale(log_fire_year) +
-                              strata(strat_id) +
-                              cluster(id),
-                            data = issa_data_winter_comb)
-m0_winter_2step
+
+```
+
+Lastly, we will fit models for the summer and winter datasets separately. Models are fit using the ISSA method that allows for random effects. This way we can automatically pool estimates across individuals to come up with a population-level estimate for each covariate.
+
+```{r}
+#| label: summer_models
+#| dependson: "combined_data"
+
+# m0_summer_2step <- Ts.estim(case_ ~ scale(log_sl)*scale(cos_ta) + 
+#                               scale(scanfi_prcC_end) +
+#                               scale(mrdtm) +
+#                               # scale(dtm_diff) +
+#                               scale(log_water_dist) +
+#                               open_land + 
+#                               scale(log_fire_year) +
+#                               strata(strat_id) +
+#                               cluster(id),
+#                             data = issa_data_summer_comb)
+# m0_summer_2step
+
+m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                            scale(scanfi_prcC_end) +
+                            scale(mrdtm) +
+                            # scale(dtm_diff) +
+                            scale(log_water_dist) +
+                            water +
+                            fire_10_low +
+                            fire_10_mod +
+                            fire_10_high +
+                            fire_20_low +
+                            fire_20_mod +
+                            fire_20_high +
+                            fire_30 +
+                            fire_40 +
+                            (1|strat_id) +
+                            (0 + scale(log_sl)|id) +
+                            (0 + scale(cos_ta)|id) +
+                            (0 + scale(log_sl):scale(cos_ta)|id) +
+                            (0 + scale(scanfi_prcC_end)|id) +
+                            (0 + scale(mrdtm)|id) +
+                            # (0 + scale(dtm_diff)|id) +
+                            (0 + scale(log_water_dist)|id) +
+                            (0 + water|id) +
+                            (0 + fire_10_low|id) +
+                            (0 + fire_10_mod|id) +
+                            (0 + fire_10_high|id) +
+                            (0 + fire_20_low|id) +
+                            (0 + fire_20_mod|id) +
+                            (0 + fire_20_high|id) +
+                            (0 + fire_30|id) +
+                            (0 + fire_40|id), 
+                          family = poisson,
+                          data = issa_data_summer_comb,
+                          map=list(theta=factor(c(NA,1:15))),
+                          start=list(theta=c(log(1e3),rep(0,15))))
+summary(m0_summer_glmmfit)
+
+saveRDS(issa_data_summer_comb, here("data/processed/issa_data_summer_comb.rds"))
+saveRDS(m0_summer_glmmfit, here("output/m0_summer_glmmfit.rds"))
+
+
+```
+
+```{r}
+#| label: winter_models
+#| dependson: "combined_data"
+
+# m0_winter_2step <- Ts.estim(case_ ~ scale(log_sl)*scale(cos_ta) + 
+#                               scale(scanfi_prcC_end) +
+#                               scale(mrdtm) +
+#                               scale(dtm_diff) +
+#                               scale(log_water_dist) +
+#                               open_land + 
+#                               scale(snow_depth):scale(log_sl) +
+#                               scale(snow_depth):scale(dtm_diff) +
+#                               # scale(log_fire_year) +
+#                               strata(strat_id) +
+#                               cluster(id),
+#                             data = issa_data_winter_comb)
+# m0_winter_2step
 
 m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
                             scale(scanfi_prcC_end) +
