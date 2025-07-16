@@ -9,7 +9,7 @@
 
 library(tidyverse)
 
-anim_function <- function(collars, years, frame_ndays) {
+anim_function <- function(collars, years, frame_ndays, aspect_ratio=0.7) {
   musk_collar_sub <- readRDS("data/processed/musk_collar.rds")  %>%
     filter(Id_Number %in% collars,
            year %in% years) %>%
@@ -19,14 +19,26 @@ anim_function <- function(collars, years, frame_ndays) {
            new_date = format(datetime, "%B %d %Y"))
   musk_collar_sub <- musk_collar_sub[seq(1,nrow(musk_collar_sub), 3*frame_ndays),]
   
+  bbox <- st_bbox(musk_collar_sub)
+  lc_aspect_ratio = (bbox$ymax - bbox$ymin)/(bbox$xmax - bbox$xmin)
+  if(lc_aspect_ratio>aspect_ratio){
+    diff_x = ((bbox$ymax - bbox$ymin)/aspect_ratio - (bbox$xmax - bbox$xmin))/2
+    bbox[["xmax"]] = bbox$xmax+diff_x
+    bbox[["xmin"]] = bbox$xmin-diff_x
+  } else {
+    diff_y = ((bbox$xmax - bbox$xmin)*aspect_ratio - (bbox$ymax - bbox$ymin))/2
+    bbox[["ymax"]] = bbox$ymax+diff_x
+    bbox[["ymin"]] = bbox$ymin-diff_x  
+    }
+    
   lc_2010_crop <- terra::rast("data/processed/lc_2010_proj_simp.tif") %>%
-    terra::crop(musk_collar_sub)
+    terra::crop(bbox)
   
-  dtm_crop <- terra::rast("data/processed/mrdtm_proj.tif") %>%
-    terra::crop(musk_collar_sub)
+  # dtm_crop <- terra::rast("data/processed/mrdtm_proj.tif") %>%
+  #   terra::crop(bbox)
   
   r_ext <- terra::ext(lc_2010_crop)
-  aspect_ratio = (r_ext$ymax - r_ext$ymin)/(r_ext$xmax - r_ext$xmin)
+  
   
   # lc_atts <- readRDS("data/processed/lc_atts.rds")
   # cols <- as.character(lc_atts$hex)
@@ -42,15 +54,15 @@ anim_function <- function(collars, years, frame_ndays) {
     geom_point(aes(x = x,
                    # colour = month,
                    y = y),
-               colour = "brown4",
+               colour = "red",
                size = 5) +
     geom_path(aes(x = x,
-                  # colour = month,
+                  colour = "red",
                   y = y),
-              linewidth = 1.5, alpha = 0.5) +
-    labs(fill = "Land cover", colour = "Month") +
-    scale_alpha_continuous(range = c(0.7,0), breaks = 2) +
-    guides(alpha = "none") +
+              linewidth = 1.5) +
+    labs(fill = "Land cover") +
+    # scale_alpha_continuous(range = c(0.7,0), breaks = 2) +
+    guides(alpha = "none", colour = "none") +
     # scale_color_gradientn(
     #   colours = c("blue","blue","red", "red", "blue"),
     #   limits = c(1,12)) +

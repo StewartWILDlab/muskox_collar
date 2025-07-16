@@ -42,7 +42,7 @@ fire_data_subset <- readRDS(here("data/processed/fire_data_subset.rds"))
 musk_collar_season <- musk_collar_filt %>%
   left_join(snowdepth_locs) %>%
   group_by(year, Id_Number) %>%
-  mutate(season = season_delineation(datetime, snow_depth, 0.1),
+  mutate(season = season_delineation(datetime, snow_depth, 0.01),
          year_min = minimum_year_season(year,datetime,season))  %>%
   mutate(id_season = str_c(Id_Number,"_",season)) %>%
   ungroup() 
@@ -55,13 +55,6 @@ Next let's look at some of the relationships between the spatial data we'll be u
 #| dependson: "prep_data"
 #| out-width: 100%
 #| layout-ncol: 1
-
-# nbr_proj <- terra::rast(here("data/processed/ntems_fire_nbr_proj.tif"))
-# # nbr_cat <- nbr_proj
-# # nbr_cat[nbr_proj>66] <- 3
-# # nbr_cat[nbr_proj<=66&nbr_proj>27] <- 2
-# # nbr_cat[nbr_proj<=27] <- 1
-# # plot(nbr_cat)
 
 ggplot() +
   geom_sf(data = musk_collar_season) +
@@ -81,8 +74,7 @@ ggplot() +
   tidyterra::geom_spatraster(data = lc_2010_proj) +
   geom_sf(data = fire_data_subset %>% 
             st_crop(lc_2010_proj) %>%
-            filter(fireyear<=2010,
-                   fireyear>=1985) %>%
+            filter(fireyear<=2010) %>%
             nngeo::st_remove_holes(),
           aes(colour = fireyear), fill = NA, linewidth = 1) +
   # scale_fill_viridis_c(trans = "sqrt") +
@@ -95,17 +87,87 @@ ggplot() +
 The first image shows that muskoxen appear to favour areas impacted by recent fires to some degree. The second image shows that canopy cover is also impacted by recent fires, although the relative recency of the fire doesn't seem to have a large effect on differences in canopy cover across areas impacted by fires. In any case, it will be important to account for changes in canopy cover that have occurred since the collars stopped recording as these areas likely had higher canopy cover during the monitoring period.
 
 ```{r}
+#| label: fire_landcover
+#| dependson: "prep_data"
+#| out-width: 100%
+#| layout-ncol: 1
+
+fire_2010 <- terra::rast("data/processed/fire_year/2010-01-01.tif")
+nbr_proj <- terra::rast(here("data/processed/ntems_fire_nbr_proj.tif"))
+lc_2010_proj <- terra::rast(here("data/processed/lc_2010_proj.tif"))
+
+fire_2010_resamp <- resample(fire_2010, lc_2010_proj, method = "near")
+reclass <- c(0,10,10,
+             10,20,20,
+             20,30,30,
+             30,40,40,
+             40,80,50)
+reclass_m <- matrix(reclass, ncol = 3, byrow = TRUE)
+fire_2010_cat <- classify(fire_2010_resamp, reclass_m, include.lowest = TRUE)
+
+nbr_proj_resamp <- resample(nbr_proj, lc_2010_proj, method = "bilinear")
+reclass2 <- c(0,27,1,
+             27,66,2,
+             66,174,3)
+reclass2_m <- matrix(reclass2, ncol = 3, byrow = TRUE)
+nbr_proj_cat <- classify(nbr_proj_resamp, reclass2_m, include.lowest = TRUE)
+nbr_proj_cat[is.na(nbr_proj_cat)] <- 0
+
+fire_sev <- fire_2010_cat + nbr_proj_cat
+fire_sev_sum <- crosstab(c(fire_sev, lc_2010_proj)) %>%
+    as_tibble()
+
+
+cols <- levels(lc_2010_proj)[[1]] %>%
+  left_join(coltab(lc_2010_proj)[[1]]) %>%
+  mutate(rgb = rgb(red, green, blue, maxColorValue = 255)) %>%
+  filter(cover != "Sub-polar or polar barren-lichen-moss",
+         cover != "Cropland")
+
+fire_sev_sum %>%
+  mutate(fire_class = case_when(
+    year_diff == 10 ~ "10_1",
+    year_diff == 11 ~ "10_1",
+    year_diff == 12 ~ "10_2",
+    year_diff == 13 ~ "10_3",
+    year_diff == 20 ~ "20_1",
+    year_diff == 21 ~ "20_1",
+    year_diff == 22 ~ "20_2",
+    year_diff == 23 ~ "20_3",
+    year_diff <= 33 ~ "30",
+    year_diff <= 43 ~ "40",
+    TRUE ~ "40+"
+  )) %>%
+  group_by(fire_class, cover) %>%
+  summarise(n = sum(n)) %>%
+  group_by(fire_class) %>%
+  mutate(p = n/sum(n),
+         cover = factor(cover, levels = cols$cover)) %>%
+  ungroup() %>%
+  ggplot(aes(x = fire_class, y = p, fill = cover)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = cols$rgb)
+  
+```
+
+```{r}
 #| label: dem_data
 #| dependson: "prep_data"
 #| out-width: 100%
 #| layout-ncol: 1
 
 mrtri3_proj <- terra::rast(here("data/processed/mrtri3_proj.tif"))
+mrtpi_proj <- terra::rast(here("data/processed/mrtpi_proj.tif"))
 
 ggplot() +
   tidyterra::geom_spatraster(data = mrtri3_proj) +
   geom_sf(data = musk_collar_season, colour = "red", alpha = 0.1) +
   scale_fill_viridis_c(trans = "sqrt") 
+
+ggplot() +
+  tidyterra::geom_spatraster(data = mrtpi_proj) +
+  geom_sf(data = musk_collar_season %>% filter(season == "winter"), colour = "red", alpha = 0.1) +
+  scale_fill_viridis_c() 
 
 # musk_collar_season %>%
 #   leaflet::leaflet() %>%
@@ -130,6 +192,75 @@ ggplot() +
 ```
 
 Doesn't seem to be a huge correlation between GPS points and proximity to water, but still worth exploring further in some models.
+
+To see if temperature extremes have an effect on movement behaviour in the winter and summer let's overlay temperature data with collar data. We will plot the days preceding and following the extreme weather day to see if there is a change in movement behaviour.
+
+```{r}
+#| label: temp_extremes
+#| dependson: "prep_data"
+
+lc_2010_proj <- terra::rast(here("data/processed/lc_2010_proj.tif"))
+
+temp_ext = 28
+rain_ext = 10
+wind_ext = 31
+weather_data_average <- readRDS(here("data/processed/weather_data_average.rds")) %>%
+  mutate(
+    temp_flag = case_when(
+      lag(avg_max_temp, 1) > temp_ext ~ "day1",
+      avg_max_temp > temp_ext ~ "day0",
+      lead(avg_max_temp, 1) > temp_ext ~ "day-1",
+      TRUE ~ "mild"),
+    rain_flag = case_when(
+      avg_precip > rain_ext ~ "day0",
+      lag(avg_precip, 1) > rain_ext ~ "day1",
+      lag(avg_precip, 2) > rain_ext ~ "day2",
+      lag(avg_precip, 3) > rain_ext ~ "day3",
+      lag(avg_precip, 4) > rain_ext ~ "day4",
+      lag(avg_precip, 5) > rain_ext ~ "day5",
+      lag(avg_precip, 6) > rain_ext ~ "day6",
+      lag(avg_precip, 7) > rain_ext ~ "day7",
+      TRUE ~ "mild"),
+    last_rain_time = as.Date(ifelse(avg_precip > rain_ext, date, NA)),
+    last_rain_time = zoo::na.locf(last_rain_time, na.rm = FALSE),
+    time_since_rain = difftime(date, last_rain_time, units = "days"),
+    weekly_rain = zoo::rollsum(avg_precip, 7, fill = NA, align = "right")
+    )
+for (i in unique(musk_collar_season$Id_Number)){
+  summer_temp <- musk_collar_season %>%
+    sf::st_transform(32609) %>%
+    filter(month >=6,
+           month<=8,
+           Id_Number == 7012) %>%
+    mutate(date = as.Date(datetime)) %>%
+    left_join(weather_data_average) %>%
+    filter(avg_mean_temp > 15)
+  
+  # lines <- summer_temp %>%
+  #   arrange(datetime) %>%
+  #   mutate(flag = rain_flag == "day0" & 
+  #            date != lag(date,1),
+  #          flag = ifelse(is.na(flag), TRUE, flag),
+  #          group = cumsum(flag)) %>%
+  #   group_by(group) %>%
+  #   summarise(do_union = FALSE) %>%
+  #   st_cast("LINESTRING")
+  
+  if(nrow(summer_temp)>0){
+    plot <- summer_temp  %>%
+      ggplot() +
+      tidyterra::geom_spatraster(data = lc_2010_proj %>% terra::crop(summer_temp)) +
+      # geom_sf(data = lines) +
+      geom_sf(aes(colour = weekly_rain), size = 4) +
+      scale_colour_viridis_c()
+  }else {next}
+  print(i)
+  print(plot)
+}
+
+```
+
+There doesn't appear to be any sign of muskoxen moving differently after days with high temperatures (\>28 degrees).Most of the time they seem to hang out where they already are, though there were a few instances where they started moving larger distances.
 
 ```{r}
 #| label: convert_for_amt
@@ -215,16 +346,27 @@ Next we assign covariate data to each step.
 
 prcC_2020_proj <- terra::rast(here("data/processed/prcC_2020_proj.tif"))
 mrtri3_proj <- terra::rast(here("data/processed/mrtri3_proj.tif"))
+mrtpi_proj <- terra::rast(here("data/processed/mrtpi_proj.tif"))
+names(mrtpi_proj) <- "tpi"
 mrdtm_proj <- terra::rast(here("data/processed/mrdtm_proj.tif"))
 water_dist <- terra::rast(here("data/processed/water_dist.tif"))
 lc_2010_proj <- terra::rast(here("data/processed/lc_2010_proj.tif"))
+lc_2010_maj <- focal(lc_2010_proj, w = 5, fun = "modal", ties = "first")
 sm_proj <- terra::rast(here("data/processed/sm_proj.nc"))
 nbr_proj <- terra::rast(here("data/processed/ntems_fire_nbr_proj.tif"))
 names(nbr_proj) <- "nbr"
+ridge_dist <- terra::rast(here("data/processed/ridge_dist.tif"))
+names(ridge_dist) <- "ridge_dist"
+weather_data_average <- readRDS(here("data/processed/weather_data_average.rds"))
 rasts <- list.files(here("data/processed/fire_year"), 
                     pattern = "*.tif$", 
                     full.names = TRUE)
 fire_year <- rast(rasts)
+fire_year_maj <- focal(fire_year, w = 5, fun = "modal", ties = "first")
+rasts2 <- list.files(here("data/processed/fire_dist"), 
+                    pattern = "*.tif$", 
+                    full.names = TRUE)
+fire_dist <- rast(rasts2)
 
 issa_data_summer <- issa_bursts_summer %>%
   mutate(
@@ -233,15 +375,21 @@ issa_data_summer <- issa_bursts_summer %>%
       x  %>%
         mutate(cos_ta = cos(ta_),
                log_sl = log(sl_),
-               id = y) %>%
+               id = y,
+               date = as.Date(t1_)) %>%
+        left_join(weather_data_average) %>%
         extract_covariates(prcC_2020_proj, where = "both") %>%
         extract_covariates(mrtri3_proj) %>%
+        extract_covariates(mrtpi_proj) %>%
         extract_covariates(mrdtm_proj, where = "both") %>%
         extract_covariates(water_dist) %>%
-        extract_covariates(lc_2010_proj) %>%
+        extract_covariates(lc_2010_maj) %>%
         extract_covariates(nbr_proj) %>%
-        extract_covariates_var_time(fire_year, max_time = years(1),
+        extract_covariates(ridge_dist) %>%
+        extract_covariates_var_time(fire_year_maj, max_time = years(1),
                                     when = "before", name_covar = "fire_year") %>%
+        extract_covariates_var_time(fire_dist, max_time = years(1),
+                                    when = "before", name_covar = "fire_dist") %>%
         drop_na(ta_)
       })
   )
@@ -253,24 +401,30 @@ issa_data_winter <- issa_bursts_winter %>%
       x  %>%
         mutate(cos_ta = cos(ta_),
                log_sl = log(sl_),
-               id = y) %>%
+               id = y,
+               date = as.Date(t1_)) %>%
+        left_join(weather_data_average) %>%
         extract_covariates(prcC_2020_proj, where = "both") %>%
         extract_covariates(mrtri3_proj) %>%
+        extract_covariates(mrtpi_proj) %>%
         extract_covariates(mrdtm_proj, where = "both") %>%
         extract_covariates(water_dist) %>%
-        extract_covariates(lc_2010_proj) %>%
+        extract_covariates(lc_2010_maj) %>%
         extract_covariates(nbr_proj) %>%
-        extract_covariates_var_time(fire_year, max_time = years(1),
+        extract_covariates(ridge_dist) %>%
+        extract_covariates_var_time(fire_year_maj, max_time = years(1),
                                     name_covar = "fire_year") %>%
         extract_covariates_var_time(sm_proj, max_time = days(2),
                                     name_covar = "snow_depth",
                                     where = "start") %>%
+        extract_covariates_var_time(fire_dist, max_time = years(1),
+                                    name_covar = "fire_dist") %>%
         drop_na(ta_)
       })
   )
 ```
 
-Next we will collapse each muskox-specific dataset into a combined dataset for each season. We will assign a new ID to each muskox burst and calculate some new covariates for the models. We will also examine the covariates for any correlation. \
+Next we will collapse each muskox-specific dataset into a combined dataset for each season. We will assign a new ID to each muskox burst and calculate some new covariates for the models. We will also examine the covariates for any correlation.\
 
 ```{r}
 #| label: combined_data
@@ -281,21 +435,25 @@ issa_data_summer_comb <- list_rbind(issa_data_summer$data_covs) %>%
   mutate(strat_id = cur_group_id()) %>%
   ungroup() %>%
   mutate(log_water_dist = log(layer/30+1),
-         water = ifelse(cover == "Water",1,0),
-         open_land = ifelse(cover %in% 
-                              c("Temperate or sub-polar shrubland",
-                                "Temperate or sub-polar grassland")
-                            ,1,0),
-         forest = ifelse(cover %in% 
-                              c("Temperate or sub-polar needleleaf forest",
-                                "Sub-polar taiga needleleaf forest",
-                                "Temperate or sub-polar broadleaf deciduous forest",
-                                "Mixed forest")
-                            ,1,0),
+         log_ridge_dist = log(ridge_dist/30+1),
+         log_fire_dist = log(fire_dist/30+1),
+         water = ifelse(focal_modal == "Water",1,0),
+         ridge = ifelse(ridge_dist == 0,1,0),
+         # open_land = ifelse(cover %in% 
+         #                      c("Temperate or sub-polar shrubland",
+         #                        "Temperate or sub-polar grassland")
+         #                    ,1,0),
+         # forest = ifelse(cover %in% 
+         #                      c("Temperate or sub-polar needleleaf forest",
+         #                        "Sub-polar taiga needleleaf forest",
+         #                        "Temperate or sub-polar broadleaf deciduous forest",
+         #                        "Mixed forest")
+         #                    ,1,0),
          nbr = replace_na(nbr,0),
          nbr_low = ifelse(is.na(nbr)|nbr<=27,1,0),
          nbr_moderate = ifelse(nbr>27&nbr<=66,1,0),
          nbr_high = ifelse(nbr>66,1,0),
+         fire = ifelse(fire_year<=40,1,0),
          fire_10 = ifelse(fire_year<=10,1,0),
          fire_20 = ifelse(fire_year>10&fire_year<=20,1,0),
          fire_30 = ifelse(fire_year>20&fire_year<=30,1,0),
@@ -305,45 +463,73 @@ issa_data_summer_comb <- list_rbind(issa_data_summer$data_covs) %>%
          fire_10_high = fire_10*nbr_high,
          fire_20_low = fire_20*nbr_low,
          fire_20_mod = fire_20*nbr_moderate,
-         fire_20_high = fire_20*nbr_high)
+         fire_20_high = fire_20*nbr_high,
+         dummy_value = 1,
+         focal_modal = str_replace_all(focal_modal, " ", "_"),
+         focal_modal = str_replace_all(focal_modal, "-", "_")) %>%
+  pivot_wider(names_from = focal_modal, values_from = dummy_value, values_fill = 0)
 
 issa_data_summer_comb %>%
-  select(log_sl, cos_ta, scanfi_prcC_end, mrdtm,
-         fire_year, open_land, forest) %>%
+  select(log_sl, cos_ta, scanfi_prcC_end, mrdtm,tpi,
+         fire_year, log_water_dist, log_ridge_dist,
+         log_fire_dist) %>%
   cor()
+
+issa_data_summer_comb %>%
+  ggplot(aes(x = fire_year)) +
+  geom_histogram(binwidth=1)
 
 issa_data_winter_comb <- list_rbind(issa_data_winter$data_covs) %>%
   group_by(id, step_id_) %>%
   mutate(strat_id = cur_group_id()) %>%
   ungroup() %>%
   mutate(log_water_dist = log(layer/100+1),
+         log_ridge_dist = log(ridge_dist/30+1),
+         log_fire_dist = log(fire_dist/30+1),
+         ridge = ifelse(ridge_dist == 0,1,0),
+         water = ifelse(focal_modal == "Water",1,0),
          ### only 3-4 potentital steps in fires aged <10 years
          ### also not enough 1-20 year fires for separate groups based on nbr
          fire_10_20 = ifelse(fire_year<=20,1,0),
          fire_30 = ifelse(fire_year>20&fire_year<=30,1,0),
          fire_40 = ifelse(fire_year>30&fire_year<=40,1,0),
          dtm_diff = mrdtm_end - mrdtm_start,
-         open_land = ifelse(cover %in% 
+         open_land = ifelse(focal_modal %in% 
                               c("Temperate or sub-polar shrubland",
                                 "Temperate or sub-polar grassland")
                             ,1,0),
-         forest = ifelse(cover %in% 
-                              c("Temperate or sub-polar needleleaf forest",
-                                "Sub-polar taiga needleleaf forest",
-                                "Temperate or sub-polar broadleaf deciduous forest",
-                                "Mixed forest")
-                            ,1,0))
+         taiga = ifelse(focal_modal %in% 
+                              c("Sub-polar taiga needleleaf forest")
+                            ,1,0),
+         dummy_value = 1,
+         focal_modal = str_replace_all(focal_modal, " ", "_"),
+         focal_modal = str_replace_all(focal_modal, "-", "_")) %>%
+  pivot_wider(names_from = focal_modal, values_from = dummy_value, values_fill = 0)
 
 issa_data_winter_comb %>%
-  select(log_sl, cos_ta, scanfi_prcC_end, mrdtm, 
-         fire_year, open_land, 
-         forest, snow_depth) %>%
+  select(log_sl, cos_ta, mrdtm, 
+         fire_year, log_fire_dist, snow_depth, avg_min_temp) %>%
   cor()
 
+issa_data_winter_comb %>%
+  ggplot(aes(x = fire_year)) +
+  geom_histogram(binwidth = 1)
+
+issa_data_winter_comb %>%
+  filter(case_ == TRUE) %>%
+  ggplot(aes(x = avg_min_temp, y = log_sl)) +
+  geom_point() +
+  geom_smooth()
+
+issa_data_summer_comb %>%
+  filter(case_ == TRUE) %>%
+  ggplot(aes(x = fire_year, y = tpi)) +
+  geom_point() +
+  geom_smooth()
 
 ```
 
-Lastly, we will fit models for the summer and winter datasets separately. Models are fit using the ISSA method that allows for random effects. This way we can automatically pool estimates across individuals to come up with a population-level estimate for each covariate.
+Lastly, we will fit models for the summer and winter datasets separately. Models are fit using the ISSA method that allows for random effects. This way we can automatically pool estimates across individuals to come up with a population-level estimate for each covariate. We'll run a fire and landcover model for each season.
 
 ```{r}
 #| label: summer_models
@@ -362,44 +548,88 @@ Lastly, we will fit models for the summer and winter datasets separately. Models
 # m0_summer_2step
 
 m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
-                            scale(scanfi_prcC_end) +
-                            scale(mrdtm) +
-                            # scale(dtm_diff) +
-                            scale(log_water_dist) +
-                            water +
-                            fire_10_low +
-                            fire_10_mod +
-                            fire_10_high +
-                            fire_20_low +
-                            fire_20_mod +
-                            fire_20_high +
-                            fire_30 +
-                            fire_40 +
-                            (1|strat_id) +
-                            (0 + scale(log_sl)|id) +
-                            (0 + scale(cos_ta)|id) +
-                            (0 + scale(log_sl):scale(cos_ta)|id) +
-                            (0 + scale(scanfi_prcC_end)|id) +
-                            (0 + scale(mrdtm)|id) +
-                            # (0 + scale(dtm_diff)|id) +
-                            (0 + scale(log_water_dist)|id) +
-                            (0 + water|id) +
-                            (0 + fire_10_low|id) +
-                            (0 + fire_10_mod|id) +
-                            (0 + fire_10_high|id) +
-                            (0 + fire_20_low|id) +
-                            (0 + fire_20_mod|id) +
-                            (0 + fire_20_high|id) +
-                            (0 + fire_30|id) +
-                            (0 + fire_40|id), 
-                          family = poisson,
-                          data = issa_data_summer_comb,
-                          map=list(theta=factor(c(NA,1:15))),
-                          start=list(theta=c(log(1e3),rep(0,15))))
+                               # scale(scanfi_prcC_end) +
+                               scale(mrdtm) +
+                               # scale(log_water_dist) +
+                               scale(log_fire_dist) +
+                               scale(log_fire_dist):fire +
+                               scale(tpi) +
+                               water +
+                               Wetland + 
+                               fire_10_low +
+                               fire_10_mod +
+                               fire_10_high +
+                               fire_20_low +
+                               fire_20_mod +
+                               fire_20_high +
+                               fire_30 +
+                               fire_40 +
+                               scale(avg_max_temp):scale(log_sl) +
+                               (1|strat_id) +
+                               (0 + scale(log_sl)|id) +
+                               (0 + scale(cos_ta)|id) +
+                               (0 + scale(log_sl):scale(cos_ta)|id) +
+                               # (0 + scale(scanfi_prcC_end)|id) +
+                               (0 + scale(tpi)|id) +
+                               # (0 + scale(log_water_dist)|id) +
+                               (0 + scale(log_fire_dist)|id) +
+                               (0 + scale(log_fire_dist):fire|id) +
+                               (0 + water|id) +
+                               (0 + Wetland|id) +
+                               (0 + scale(mrdtm)|id) +
+                               (0 + fire_10_low|id) +
+                               (0 + fire_10_mod|id) +
+                               (0 + fire_10_high|id) +
+                               (0 + fire_20_low|id) +
+                               (0 + fire_20_mod|id) +
+                               (0 + fire_20_high|id) +
+                               (0 + fire_30|id) +
+                               (0 + fire_40|id) +
+                               (0 + scale(avg_max_temp):scale(log_sl)|id), 
+                             family = poisson,
+                             data = issa_data_summer_comb,
+                             map=list(theta=factor(c(NA,1:18))),
+                             start=list(theta=c(log(1e3),rep(0,18))))
 summary(m0_summer_glmmfit)
 
 saveRDS(issa_data_summer_comb, here("data/processed/issa_data_summer_comb.rds"))
+# issa_data_summer_comb <- readRDS("data/processed/issa_data_summer_comb.rds")
 saveRDS(m0_summer_glmmfit, here("output/m0_summer_glmmfit.rds"))
+
+m0_summer_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                               # scale(scanfi_prcC_end) +
+                               scale(mrdtm) +
+                               scale(log_water_dist) +
+                               scale(tpi) +
+                               water +
+                               Sub_polar_taiga_needleleaf_forest +
+                               Temperate_or_sub_polar_shrubland +
+                               Temperate_or_sub_polar_grassland +
+                               Mixed_forest +
+                               Wetland +
+                               Barren_Lands +
+                               scale(avg_max_temp):scale(log_sl) +
+                               (1|strat_id) +
+                               (0 + scale(log_sl)|id) +
+                               (0 + scale(cos_ta)|id) +
+                               (0 + scale(log_sl):scale(cos_ta)|id) +
+                               # (0 + scale(scanfi_prcC_end)|id) +
+                               (0 + scale(tpi)|id) +
+                               (0 + scale(log_water_dist)|id) +
+                               (0 + water|id) +
+                               (0 + scale(mrdtm)|id) +
+                               (0 + Sub_polar_taiga_needleleaf_forest|id) +
+                               (0 + Temperate_or_sub_polar_shrubland|id) +
+                               (0 + Temperate_or_sub_polar_grassland|id) +
+                               (0 + Mixed_forest|id) +
+                               (0 + Wetland|id) +
+                               (0 + Barren_Lands|id) +
+                               (0 + scale(avg_max_temp):scale(log_sl)|id), 
+                             family = poisson,
+                             data = issa_data_summer_comb,
+                             map=list(theta=factor(c(NA,1:14))),
+                             start=list(theta=c(log(1e3),rep(0,14))))
+summary(m0_summer_glmmfit_lc)
 
 
 ```
@@ -423,36 +653,75 @@ saveRDS(m0_summer_glmmfit, here("output/m0_summer_glmmfit.rds"))
 # m0_winter_2step
 
 m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
-                            scale(scanfi_prcC_end) +
-                            scale(mrdtm) +
-                            # scale(dtm_diff) +
-                            scale(log_water_dist) +
-                            # open_land +
-                            fire_10_20 +
-                            fire_30 +
-                            fire_40 +
-                            scale(snow_depth):scale(log_sl) +
-                            (1|strat_id) +
-                            (0 + scale(log_sl)|id) +
-                            (0 + scale(cos_ta)|id) +
-                            (0 + scale(log_sl):scale(cos_ta)|id) +
-                            (0 + scale(scanfi_prcC_end)|id) +
-                            (0 + scale(mrdtm)|id) +
-                            # (0 + scale(dtm_diff)|id) +
-                            (0 + scale(log_water_dist)|id) +
-                            # (0 + open_land|id) +
-                            (0 + scale(snow_depth):scale(log_sl)|id) +
-                            (0 + fire_10_20|id) +
-                            (0 + fire_30|id) +
-                            (0 + fire_40|id), 
-                          family = poisson,
-                          data = issa_data_winter_comb,
-                          map=list(theta=factor(c(NA,1:10))),
-                          start=list(theta=c(log(1e3),rep(0,10))))
+                               scale(mrdtm) +
+                               scale(tpi) +
+                               scale(log_water_dist) +
+                               water +
+                               Wetland +
+                               fire_10_20 +
+                               fire_30 +
+                               fire_40 +
+                               scale(snow_depth):scale(log_sl) +
+                               scale(avg_min_temp):scale(log_sl) +
+                               (1|strat_id) +
+                               (0 + scale(log_sl)|id) +
+                               (0 + scale(cos_ta)|id) +
+                               (0 + scale(log_sl):scale(cos_ta)|id) +
+                               (0 + water|id) +
+                               (0 + Wetland|id) +
+                               (0 + scale(tpi)|id) +
+                               (0 + scale(mrdtm)|id) +
+                               (0 + scale(log_water_dist)|id) +
+                               (0 + scale(snow_depth):scale(log_sl)|id) +
+                               (0 + scale(avg_min_temp):scale(log_sl)|id) +
+                               (0 + fire_10_20|id) +
+                               (0 + fire_30|id) +
+                               (0 + fire_40|id), 
+                             family = poisson,
+                             data = issa_data_winter_comb,
+                             map=list(theta=factor(c(NA,1:13))),
+                             start=list(theta=c(log(1e3),rep(0,13))))
 
 summary(m0_winter_glmmfit)
 
 saveRDS(issa_data_winter_comb, here("data/processed/issa_data_winter_comb.rds"))
 saveRDS(m0_winter_glmmfit, here("output/m0_winter_glmmfit.rds"))
+
+
+m0_winter_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                                  scale(mrdtm) +
+                                  scale(tpi) +
+                                  scale(log_water_dist) +
+                                  water +
+                                  Wetland +
+                                  Sub_polar_taiga_needleleaf_forest +
+                                  Temperate_or_sub_polar_shrubland +
+                                  Temperate_or_sub_polar_grassland +
+                                  Mixed_forest +
+                                  Barren_Lands +
+                                  scale(snow_depth):scale(log_sl) +
+                                  scale(avg_min_temp):scale(log_sl) +
+                                  (1|strat_id) +
+                                  (0 + scale(log_sl)|id) +
+                                  (0 + scale(cos_ta)|id) +
+                                  (0 + scale(log_sl):scale(cos_ta)|id) +
+                                  (0 + water|id) +
+                                  (0 + Wetland|id) +
+                                  (0 + scale(tpi)|id) +
+                                  (0 + scale(mrdtm)|id) +
+                                  (0 + scale(log_water_dist)|id) +
+                                  (0 + scale(snow_depth):scale(log_sl)|id) +
+                                  (0 + scale(avg_min_temp):scale(log_sl)|id) +
+                                  (0 + Sub_polar_taiga_needleleaf_forest|id) +
+                                  (0 + Temperate_or_sub_polar_shrubland|id) +
+                                  (0 + Temperate_or_sub_polar_grassland|id) +
+                                  (0 + Mixed_forest|id) +
+                                  (0 + Barren_Lands|id), 
+                                family = poisson,
+                                data = issa_data_winter_comb,
+                                map=list(theta=factor(c(NA,1:14))),
+                                start=list(theta=c(log(1e3),rep(0,14))))
+summary(m0_winter_glmmfit_lc)
+saveRDS(m0_winter_glmmfit_lc, here("output/m0_winter_glmmfit_lc.rds"))
 
 ```

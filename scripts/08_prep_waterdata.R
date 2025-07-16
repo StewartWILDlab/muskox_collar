@@ -17,8 +17,8 @@ musk_collar <- readRDS("data/processed/musk_collar.rds") %>%
   sf::st_transform(32609)
 
 ### Load NRCan water body data
-water_data <- sf::read_sf("data/raw/geography/waterbodies/lhy_000c16a_e.shp")
-
+water_data <- sf::read_sf("data/raw/geography/waterbodies/nwt_water/canvec_50K_NT_hydro/waterbody_2_3.shp")
+large_water_data <- sf::read_sf("data/raw/geography/waterbodies/lhy_000c16a_e.shp")
 
 ### create buffer of collar data bounding box
 large_buffer <- musk_collar %>%
@@ -33,9 +33,17 @@ small_buffer <- musk_collar %>%
 ### crop water data, transform coordinates, and crop again
 water_data_crop <- water_data %>%
   sf::st_intersection(large_buffer %>% st_transform(st_crs(water_data))) %>%
+  st_transform(32609)%>%
+  ### select lakes
+  filter(definit == 83,
+         perm == 59)
+large_water_data_crop <- large_water_data %>%
+  sf::st_intersection(large_buffer %>% st_transform(st_crs(large_water_data))) %>%
   st_transform(32609)
 
 saveRDS(water_data_crop, "data/processed/water_data_crop.rds")
+saveRDS(large_water_data_crop, "data/processed/large_water_data_crop.rds")
+water_data_crop <- readRDS("data/processed/water_data_crop.rds")
 
 ### create distance to water raster
 rast <- terra::rast(water_data_crop, resolution = 30)

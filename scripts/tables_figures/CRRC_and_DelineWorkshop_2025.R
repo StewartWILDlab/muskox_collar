@@ -1,0 +1,681 @@
+######################################################
+############ Muskox Collar Project ############ 
+######################################################
+### Using muskox collar data from the Sahtu region, NWT to investigate
+### muskox habitat, home range, and movement behaviour below treeline
+
+######################################################
+### Script to produce tables and figures for CRRC presentation
+
+library(tidyverse)
+library(here)
+library(terra)
+library(sf)
+library(glmmTMB)
+
+### set factor levels and colours 
+ids <- c("706", "708", "7010", "7011", "7012", "7013", "7080")
+id_cols <- RColorBrewer::brewer.pal(7,"Set1")
+names(id_cols) <- ids
+id_colscale <- scale_fill_manual(values = id_cols)
+seas <- c("Summer", "Winter", "Calving")
+
+### set theme
+theme_proj <- theme_bw() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+### Load data
+lc_2010_proj <- terra::rast("data/processed/lc_2010_proj.tif")
+lc_2010_proj_simp <- terra::rast("data/processed/lc_2010_proj_simp.tif")
+water_data_crop <- readRDS("data/processed/large_water_data_crop.rds")
+fire_data_subset <- readRDS(here("data/processed/fire_data_subset.rds"))
+mrdtm_proj <- terra::rast(here("data/processed/mrdtm_proj.tif"))
+musk_season_mcp <- readRDS("output/musk_season_mcp.rds") %>%
+  sf::st_as_sf() %>%
+  mutate(year = str_split_i(id,"_",2),
+         season = str_split_i(id,"_",3),
+         id = as.character(str_split_i(id,"_",1)),
+         id = factor(id, levels = ids))
+hr_landcover <- readRDS("output/hr_landcover.rds")
+place_names <- sf::read_sf("data/raw/geography/cgn_nt_shp_eng.shp") %>%
+  filter(CATEGORY == "Populated Place",
+         GEONAME != "Canol") %>%
+  st_transform(crs(mrdtm_proj))
+
+### Load ISSA data and models
+issa_data_summer_comb <- readRDS(here("data/processed/issa_data_summer_comb.rds"))
+m0_summer_glmmfit <- readRDS(here("output/m0_summer_glmmfit.rds"))
+issa_data_winter_comb <- readRDS(here("data/processed/issa_data_winter_comb.rds"))
+m0_winter_glmmfit <- readRDS(here("output/m0_winter_glmmfit.rds"))
+
+### Seasonal home range polygons using MCP ----
+bbox = sf::st_bbox(musk_season_mcp)
+
+ggplot() +
+  geom_sf(data = water_data_crop, fill = "lightblue") +
+  geom_sf(data = place_names, colour = "black") +
+  geom_sf_text(data = place_names, aes(label = GEONAME),
+               colour = "black", 
+               nudge_x = -12000, nudge_y = 4000) +
+  geom_sf(data = musk_season_mcp %>%
+            filter(season != "Calving"), 
+          aes(fill = id, alpha = season)) +
+  coord_sf(xlim = c(bbox$xmin, bbox$xmax),
+           ylim = c(bbox$ymin, bbox$ymax),
+           expand = FALSE) +
+  id_colscale +
+  labs(fill = "Muskox ID")+ 
+  facet_wrap(~season) +
+  scale_alpha_manual(values = c(0.5,1), guide = FALSE) +
+  theme(plot.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "inside",
+        legend.position.inside = c(0.93,0.6)) + 
+  ggspatial::annotation_scale(
+    location = "br",
+    bar_cols = c("black", "white"),
+    pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"),
+    text_cex = 1, text_col = "black"
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tl", which_north = "true",
+    height = unit(2, "cm"), width = unit(2, "cm"),
+    pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+    style = ggspatial::north_arrow_fancy_orienteering(
+      line_col = "grey20",
+      text_col = "black",
+      text_size = 14
+    )
+  )
+
+ggsave("output/figures/mcps.png", width = 8, height = 6)
+
+musk_season_mcp %>%
+  group_by(season) %>%
+  summarise(area = mean(area))
+
+### Seasonal home range land cover comparison ----
+musk_lc_points <- terra::extract(lc_2010_proj_simp, musk_collar_filt)
+
+musk_collar_filt %>%
+  st_drop_geometry() %>%
+  mutate(lc = musk_lc_points$cover,
+         season = ifelse(month < 11& month > 4, "Summer", "Winter")) %>%
+  group_by(lc, season) %>%
+  summarise(n = n()) %>%
+  group_by(season) %>%
+  mutate(prop = n/sum(n)) %>%
+  ungroup() %>%
+  ggplot(aes(x = lc, y = prop, fill = lc)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~season) +
+  scale_fill_manual(values = c("#003D00", "#5C752B", "#B38A33", "#E0CF8A", "#6BA38A",
+                               "#A8ABAE", "#4C70A3")) +
+  labs(fill = "Land cover") +
+  xlab("") +
+  ylab("Proportion of locations") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) 
+
+ggsave("output/figures/lc_gps_locs.png", width = 6, height = 4)
+
+
+# hr_landcover %>%
+#   mutate(season = str_split_i(range_id,"_",3),
+#          class = case_when(
+#            cover %in% c("Temperate or sub-polar needleleaf forest",
+#                         "Sub-polar taiga needleleaf forest") ~ "Needleleaf forest",
+#            cover %in% c("Temperate or sub-polar broadleaf deciduous forest",
+#                         "Mixed forest") ~ "Mixed forest",
+#            cover %in% c("Temperate or sub-polar shrubland",
+#                         "Sub-polar or polar shrubland-lichen-moss") ~ "Shrubland",
+#            cover %in% c("Temperate or sub-polar grassland",
+#                         "Sub-polar or polar grassland-lichen-moss") ~ "Grassland",
+#            cover %in% c("Wetland") ~ "Wetland",
+#            cover %in% c("Barren Lands",
+#                         "Sub-polar or polar barren-lichen-moss") ~ "Barren",
+#            cover %in% "Water" ~ "Water",
+#            TRUE ~ NA
+#          )) %>%
+#   filter(season != "Calving",
+#          group == "true") %>%
+#   group_by(season, range_id) %>%
+#   mutate(total = sum(n),
+#          prop = n/total) %>%
+#   group_by(class, season) %>%
+#   summarise(prop = mean(prop)) %>%
+#   ggplot(aes(x = class, y = prop)) +
+#   geom_bar(stat = "identity") +
+#   facet_wrap(~season)
+  
+
+### Muskox location by season (companion to animated gifs) ----
+dat <- readRDS("data/processed/musk_collar.rds")  %>%
+  filter(Id_Number == 7012,
+               year == 2011) %>%
+  sf::st_transform(32609)%>%
+  mutate(x = sf::st_coordinates(geometry)[,1],
+         y = sf::st_coordinates(geometry)[,2],
+         new_date = format(datetime, "%B %d %Y"),
+         season = ifelse(month>4&month<11,"Summer (May - October)","Winter (November - April)"))
+
+lc_2010_crop_dat <- terra::rast("data/processed/lc_2010_proj_simp.tif") %>%
+  terra::crop(dat)
+
+dat %>%
+  arrange(datetime) %>%
+  ggplot() +
+  tidyterra::geom_spatraster(data = lc_2010_crop_dat) +
+  geom_point(aes(x = x,
+                 y = y),
+             colour = "red",
+             size = 5) +
+  labs(fill = "Land cover") +
+  guides(alpha = "none", colour = "none") +
+  facet_wrap(~season) +
+  theme_void() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.87,0.75),
+        legend.background = element_rect(fill="white"),
+        legend.margin = margin(c(5,5,5,5)))
+ggsave("output/figures/7012_2011.png", width = 14, height = 8)
+
+
+### Land cover and fires map ----
+r_ext <- ext(lc_2010_proj_simp)
+aspect_ratio = (r_ext$ymax - r_ext$ymin)/(r_ext$xmax - r_ext$xmin)
+
+(lc_map <- ggplot() +
+  tidyterra::geom_spatraster(data = lc_2010_proj_simp) +
+  labs(fill = "Land cover 2010") +
+  coord_sf(xlim = c(r_ext$xmin, r_ext$xmax),
+           ylim = c(r_ext$ymin, r_ext$ymax),
+           expand = FALSE) +
+  theme_void() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.85, 0.2),
+        legend.background = element_rect(fill="white"),
+        legend.margin = margin(c(5,5,5,5))) + 
+  ggspatial::annotation_scale(
+    location = "bl",
+    bar_cols = c("black", "white"),
+    pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"),
+    text_cex = 1, text_col = "white"
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tl", which_north = "true",
+    height = unit(3, "cm"), width = unit(3, "cm"),
+    pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+    style = ggspatial::north_arrow_fancy_orienteering(
+      line_col = "grey20",
+      text_col = "white",
+      text_size = 14
+    )
+  )
+)
+ggsave("output/figures/fire_lc1.png", width = 7, height = 7*aspect_ratio)
+
+lc_map +
+  geom_sf(data = fire_data_subset %>%
+            st_crop(lc_2010_proj) %>%
+            filter(fireyear<=2010,
+                   fireyear>=1985) %>%
+            nngeo::st_remove_holes(),
+          colour = "pink", fill = NA, linewidth = 1) +
+  coord_sf(xlim = c(r_ext$xmin, r_ext$xmax),
+           ylim = c(r_ext$ymin, r_ext$ymax),
+           expand = FALSE)
+
+ggsave("output/figures/fire_lc2.png", width = 7, height = 7*aspect_ratio)
+
+
+### Study region elevation ----
+r_ext <- ext(mrdtm_proj)
+aspect_ratio = (r_ext$ymax - r_ext$ymin)/(r_ext$xmax - r_ext$xmin)
+
+ggplot() +
+  tidyterra::geom_spatraster(data = mrdtm_proj) +
+  geom_sf(data = place_names, colour = "white") +
+  geom_sf_text(data = place_names, aes(label = GEONAME),
+                colour = "white", 
+               nudge_x = -12000, nudge_y = 4000) +
+  labs(fill = "Elevation (m)") + 
+  coord_sf(xlim = c(r_ext$xmin, r_ext$xmax),
+           ylim = c(r_ext$ymin, r_ext$ymax),
+           expand = FALSE) +
+  theme_void() +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.85, 0.2),
+        legend.background = element_rect(fill="white"),
+        legend.margin = margin(c(5,5,5,5))) + 
+  ggspatial::annotation_scale(
+    location = "bl",
+    bar_cols = c("black", "white"),
+    pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"),
+    text_cex = 1, text_col = "white"
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tl", which_north = "true",
+    height = unit(3, "cm"), width = unit(3, "cm"),
+    pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+    style = ggspatial::north_arrow_fancy_orienteering(
+      line_col = "grey20",
+      text_col = "white",
+      text_size = 14
+    )
+  )
+  
+ggsave("output/figures/elevation.png", width = 7, height = 7*aspect_ratio)
+  
+
+### Fire RSS plot ----
+
+fireyear_summer_data <- issa_data_summer_comb %>%
+  modelr::data_grid(log_sl = mean(log_sl),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = mean(tpi),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    avg_max_temp = mean(avg_max_temp),
+                    fire_cat = c("fire_10_low", "fire_10_mod", "fire_10_high",
+                                 "fire_20_low", "fire_20_mod", "fire_20_high",
+                                 "fire_30", "fire_40"),
+                    value = 1,
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) %>%
+  mutate(fire_cat2 = fire_cat) %>%
+  pivot_wider(names_from = fire_cat, values_from = value, values_fill = 0)
+
+
+fireyear_summer_pred <- predict(m0_summer_glmmfit, 
+                         newdata = fireyear_summer_data,
+                         type = "link",
+                         re.form = NULL,
+                         allow.new.levels=TRUE,
+                         se.fit = TRUE)
+
+fireyear_winter_data <- issa_data_winter_comb %>%
+  modelr::data_grid(log_sl = mean(log_sl),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = mean(tpi),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    snow_depth = mean(snow_depth),
+                    avg_min_temp = mean(avg_min_temp),
+                    fire_cat = c("fire_10_20", "fire_30", "fire_40"),
+                    value = 1,
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) %>%
+  mutate(fire_cat2 = fire_cat) %>%
+  pivot_wider(names_from = fire_cat, values_from = value, values_fill = 0)
+
+fireyear_winter_pred <- predict(m0_winter_glmmfit, 
+                         newdata = fireyear_winter_data,
+                         type = "link",
+                         re.form = NULL,
+                         allow.new.levels=TRUE,
+                         se.fit = TRUE)
+
+fireyear_rss <- fireyear_summer_data %>%
+  mutate(pred = fireyear_summer_pred$fit,
+         se = fireyear_summer_pred$se.fit) %>%
+  mutate(rss = pred,
+         season = "Summer") %>%
+  bind_rows(fireyear_winter_rss <- fireyear_winter_data %>%
+              mutate(pred = fireyear_winter_pred$fit,
+                     se = fireyear_winter_pred$se.fit) %>%
+              mutate(rss = pred,
+                     season = "Winter")) %>%
+  mutate(
+    fire_year = case_when(
+      fire_cat2 %in% c("fire_10_low", "fire_10_mod", "fire_10_high") ~ "1 - 10",
+      fire_cat2 %in% c("fire_20_low", "fire_20_mod","fire_20_high") ~ "11 - 20",
+      fire_cat2 %in% c("fire_30") ~ "21 - 30",
+      fire_cat2 %in% c("fire_40") ~ "31 - 40",
+      fire_cat2 %in% c("fire_10_20") ~"1 - 20"),
+    fire_severity = case_when(
+      fire_cat2 %in% c("fire_10_low", "fire_20_low") ~ "Low",
+      fire_cat2 %in% c("fire_10_mod", "fire_20_mod") ~ "Mod",
+      fire_cat2 %in% c("fire_10_high", "fire_20_high") ~ "High",
+      TRUE ~ "NA"
+    ),
+    fire_severity = factor(fire_severity, levels = c("Low", "Mod", "High", "NA")),
+    rss.high = rss + 1.96*se,
+    rss.low = rss - 1.96*se
+  ) %>%
+  group_by(fire_year, season) %>%
+  mutate(width = 0.1*length(unique(fire_severity)),
+         width = ifelse(season == "Winter", width*3/4, width)) %>%
+  ungroup()
+
+ggplot(data = fireyear_rss %>% filter(id == "newid"), 
+       aes(x = fire_year, y = rss,
+           colour = fire_severity)) +
+  geom_errorbar(aes(ymin = rss.low, ymax = rss.high, width = width),
+                position = position_dodge(width = 0.7)) +
+  geom_point(size = 3,position = position_dodge(width = 0.7)) +
+  geom_point(aes(group = fire_severity, colour = "individual-level estimates"), 
+              size = 1,
+             position = position_dodge(width = 0.7),
+             data = fireyear_rss %>% filter(id != "newid")) +
+  
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~season, nrow = 1, scales = "free_x") +
+  xlab("Years since fire") + 
+  ylab("Relative selection strength") +
+  labs(colour = "Fire severity") +
+  scale_colour_manual(values = c("#fcae91", "#fb6a4a","#cb181d", "black", "darkgrey"))+
+  theme_proj
+
+ggsave("output/figures/fireyear_rss.png", width = 6, height = 4)
+
+
+### TPI RSS plot ----
+
+tpi_summer_data <- issa_data_summer_comb %>%
+  modelr::data_grid(log_sl = mean(log_sl),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = modelr::seq_range(tpi, 30, trim = 0.2),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    avg_max_temp = mean(avg_max_temp),
+                    fire_10_low = 0,
+                    fire_10_mod = 0,
+                    fire_10_high = 0,
+                    fire_20_low = 0,
+                    fire_20_mod = 0,
+                    fire_20_high = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,
+                    value = 1,
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) 
+
+
+tpi_summer_pred <- predict(m0_summer_glmmfit, 
+                                newdata = tpi_summer_data,
+                                type = "link",
+                                re.form = NULL,
+                                allow.new.levels=TRUE,
+                                se.fit = TRUE)
+
+tpi_winter_data <- issa_data_winter_comb %>%
+  modelr::data_grid(log_sl = mean(log_sl),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = modelr::seq_range(tpi, 30, trim = 0.2),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    snow_depth = mean(snow_depth),
+                    avg_min_temp = mean(avg_min_temp),
+                    fire_10_20 = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,                   
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) 
+
+tpi_winter_pred <- predict(m0_winter_glmmfit, 
+                                newdata = tpi_winter_data,
+                                type = "link",
+                                re.form = NULL,
+                                allow.new.levels=TRUE,
+                                se.fit = TRUE)
+
+tpi_rss <- tpi_summer_data %>%
+  mutate(pred = tpi_summer_pred$fit,
+         se = tpi_summer_pred$se.fit) %>%
+  mutate(rss = pred,
+         season = "Summer") %>%
+  bind_rows(tpi_winter_data %>%
+              mutate(pred = tpi_winter_pred$fit,
+                     se = tpi_winter_pred$se.fit) %>%
+              mutate(rss = pred,
+                     season = "Winter")) %>%
+  mutate(
+    rss.high = rss + 1.96*se,
+    rss.low = rss - 1.96*se
+  ) 
+
+ggplot(data = tpi_rss %>% filter(id == "newid"), 
+       aes(x = tpi, y = rss, colour = "population-level estimate")) +
+  geom_line(aes(group = id, colour = "individual-level estimates"),
+             data = tpi_rss %>% filter(id != "newid")) +
+  geom_ribbon(aes(ymin = rss.low, ymax = rss.high), 
+              alpha = 0.5, colour = NA) +
+  geom_line(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~season, nrow = 1) +
+  xlab("Topographic Position Index") + 
+  ylab("Relative selection strength") +
+  scale_colour_manual(values = c("red", "black")) +
+  labs(colour = "") +
+  theme_proj
+
+ggsave("output/figures/tpi_rss.png", width = 6, height = 4)
+
+
+
+
+### TRI RSS plot ----
+
+tri_summer_data <- issa_data_summer_comb %>%
+  modelr::data_grid(log_sl = mean(log_sl),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = mean(tpi),
+                    mrdtm = modelr::seq_range(mrdtm, 30),
+                    water = 0,
+                    avg_max_temp = mean(avg_max_temp),
+                    fire_10_low = 0,
+                    fire_10_mod = 0,
+                    fire_10_high = 0,
+                    fire_20_low = 0,
+                    fire_20_mod = 0,
+                    fire_20_high = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,
+                    value = 1,
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) 
+
+
+tri_summer_pred <- predict(m0_summer_glmmfit, 
+                           newdata = tri_summer_data,
+                           type = "link",
+                           re.form = NULL,
+                           allow.new.levels=TRUE,
+                           se.fit = TRUE)
+
+tri_winter_data <- issa_data_winter_comb %>%
+  modelr::data_grid(log_sl = mean(log_sl),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = mean(tpi),
+                    mrdtm = modelr::seq_range(mrdtm, 30),
+                    water = 0,
+                    snow_depth = mean(snow_depth),
+                    avg_min_temp = mean(avg_min_temp),
+                    fire_10_20 = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,                   
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) 
+
+tri_winter_pred <- predict(m0_winter_glmmfit, 
+                           newdata = tri_winter_data,
+                           type = "link",
+                           re.form = NULL,
+                           allow.new.levels=TRUE,
+                           se.fit = TRUE)
+
+tri_rss <- tri_summer_data %>%
+  mutate(pred = tri_summer_pred$fit,
+         se = tri_summer_pred$se.fit) %>%
+  mutate(rss = pred,
+         season = "Summer") %>%
+  bind_rows(tri_winter_data %>%
+              mutate(pred = tri_winter_pred$fit,
+                     se = tri_winter_pred$se.fit) %>%
+              mutate(rss = pred,
+                     season = "Winter")) %>%
+  mutate(
+    rss.high = rss + 1.96*se,
+    rss.low = rss - 1.96*se
+  ) 
+
+ggplot(data = tri_rss %>% filter(id == "newid"), 
+       aes(x = mrdtm, y = rss, colour = "population-level estimate")) +
+  geom_line(aes(group = id, colour = "individual-level estimates"),
+            data = tri_rss %>% filter(id != "newid")) +
+  geom_ribbon(aes(ymin = rss.low, ymax = rss.high), 
+              alpha = 0.5, colour = NA) +
+  geom_line(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~season, nrow = 1) +
+  xlab("Terrain Ruggedness Index") + 
+  ylab("Relative selection strength") +
+  scale_colour_manual(values = c("red", "black")) +
+  labs(colour = "") +
+  theme_proj
+
+ggsave("output/figures/tri_rss.png", width = 6, height = 4)
+
+
+
+
+### Temperature RSS plot ----
+
+temper_summer_data <- issa_data_summer_comb %>%
+  modelr::data_grid(log_sl = modelr::seq_range(log_sl,30),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = mean(tpi),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    avg_max_temp = c(0, 10, 20),
+                    fire_10_low = 0,
+                    fire_10_mod = 0,
+                    fire_10_high = 0,
+                    fire_20_low = 0,
+                    fire_20_mod = 0,
+                    fire_20_high = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,
+                    value = 1,
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) 
+
+
+temper_summer_pred <- predict(m0_summer_glmmfit, 
+                           newdata = temper_summer_data,
+                           type = "link",
+                           re.form = NULL,
+                           allow.new.levels=TRUE,
+                           se.fit = TRUE)
+
+temper_winter_data <- issa_data_winter_comb %>%
+  modelr::data_grid(log_sl = modelr::seq_range(log_sl, 30),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = mean(tpi),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    snow_depth = mean(snow_depth),
+                    avg_min_temp = c(-40, -20, 0),
+                    fire_10_20 = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,                   
+                    strat_id = NA,
+                    id = c(as.character(id),"newid")
+  ) 
+
+temper_winter_pred <- predict(m0_winter_glmmfit, 
+                           newdata = temper_winter_data,
+                           type = "link",
+                           re.form = NULL,
+                           allow.new.levels=TRUE,
+                           se.fit = TRUE)
+
+temper_rss <- temper_summer_data %>%
+  mutate(pred = temper_summer_pred$fit,
+         se = temper_summer_pred$se.fit) %>%
+  mutate(rss = pred,
+         season = "Summer") %>%
+  bind_rows(temper_winter_data %>%
+              mutate(pred = temper_winter_pred$fit,
+                     se = temper_winter_pred$se.fit) %>%
+              mutate(rss = pred,
+                     season = "Winter")) %>%
+  mutate(
+    rss.high = rss + 1.96*se,
+    rss.low = rss - 1.96*se,
+    temp_cat = factor(ifelse(is.na(avg_max_temp),avg_min_temp, avg_max_temp))
+  ) 
+
+ggplot(data = temper_rss %>% filter(id == "newid"), 
+       aes(x = exp(log_sl), y = rss, colour = "population-level estimate")) +
+  geom_line(aes(group = id, colour = "individual-level estimates"),
+            data = temper_rss %>% filter(id != "newid")) +
+  geom_ribbon(aes(ymin = rss.low, ymax = rss.high), 
+              alpha = 0.5, colour = NA) +
+  geom_line(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~season + temp_cat, nrow = 2, scales = "free_x") +
+  xlab("Step Length") + 
+  ylab("Relative selection strength") +
+  scale_colour_manual(values = c("red", "black")) +
+  labs(colour = "") +
+  theme_proj
+
+ggsave("output/figures/temper_rss.png", width = 8, height = 6)
+
+
+
+
+### Summer range selection ----
+musk_sum_lc <- readRDS("output/musk_sum_lc.rds")
+
+musk_sum_lc %>%
+  mutate(group2 = ifelse(group == "true", 
+                         "Occupied summer range",
+                         "Available summer range")) %>%
+  ggplot(aes(x = group2, y = for_per, fill = group2)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(begin = 0.3) +
+  xlab("") +
+  ylab("Proportion grassland/shrubland") +
+  guides(fill = FALSE) +
+  theme_proj
+
+ggsave("output/figures/summerrange_boxplot.png", width = 5, height = 3)
+
+### Winter range selection ----
+musk_wint_tpi <- readRDS("output/musk_wint_tpi.rds")
+
+musk_wint_tpi %>%
+  mutate(group2 = ifelse(group == "true", 
+                         "Occupied winter range",
+                         "Available winter range")) %>%
+  ggplot(aes(x = group2, y = value, fill = group2)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(begin = 0.3) +
+  xlab("") +
+  ylab("Topographic position index") +
+  guides(fill = FALSE) +
+  theme_proj
+
+ggsave("output/figures/winterrange_boxplot.png", width = 5, height = 3)
+

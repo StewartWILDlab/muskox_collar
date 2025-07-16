@@ -49,11 +49,12 @@ fire_data_subset <- fire_data_nbac_crop %>%
   # mutate(effectdate = as.POSIXct(effectdate))
 
 saveRDS(fire_data_subset, "data/processed/fire_data_subset.rds")
+# fire_data_subset <- readRDS("data/processed/fire_data_subset.rds")
 
 ### Create raster of years since fire for all years covered by muskox collar data
 ### create a stacked raster of years since fire
 dates <- seq(ymd("2007-01-01"), ymd("2012-01-01"), by="year")
-temp_rast <- rast(fire_data_subset, resolution = 100)
+temp_rast <- rast(fire_data_subset, resolution = 30)
 
 map(dates, function(x){
   rasterize_fire_year(fire_data_subset, 
@@ -74,6 +75,32 @@ rasts <- list.files("data/processed/fire_year",
                     full.names = TRUE)
 fire_year <- rast(rasts)
 
+### create distance raster
+
+#Note: we use remove holes tool to identify the outer boundaries of each fire.
+fire_data_subset_fill <- fire_data_subset %>%
+  nngeo::st_remove_holes()
+
+map(dates, function(x){
+  dist <- fire_data_subset_fill %>%
+    filter(fireyear < year(x)) %>%
+    st_cast("MULTILINESTRING") %>%
+    rasterize(temp_rast) %>%
+    distance() %>%
+    crop_and_reproject_to_gps_points(
+      musk_collar,
+      crs_epsg = 32609,
+      buffer_dist = 10000)
+  time(dist) <- x
+  dist %>%
+    save_raster_to_folder(folder_name = "fire_dist",
+                          date = x)
+})
+
+rasts2 <- list.files("data/processed/fire_dist", 
+                    pattern = "*.tif$", 
+                    full.names = TRUE)
+fire_dist <- rast(rasts2)
 
 ### Load NTEMS fire NBR
 ntems_fire_nbr <- terra::rast("data/raw/fire/NTEMS/CA_Forest_Wildfire_dNBR_1985_2020.tif")
@@ -170,3 +197,5 @@ writeRaster(ntems_fire_nbr_proj, "data/processed/ntems_fire_nbr_proj.tif", overw
 #                     pattern = "*.tif$", 
 #                     full.names = TRUE)
 # fire_postdate_stack <- rast(rasts)
+
+

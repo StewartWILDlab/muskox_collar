@@ -8,6 +8,8 @@
 ### Script to download land cover data and associated metadata from 
 ### https://open.canada.ca/data/en/dataset/c688b87f-e85f-4842-b0e1-a8f79ebf1133
 
+library(tidyverse)
+
 ### Create folders for data if they don't exist
 dir.create("data/raw/landcover", showWarnings = FALSE)
 dir.create("data/raw/geography", showWarnings = FALSE)
@@ -18,6 +20,7 @@ dir.create("data/raw/fire/NBAC", showWarnings = FALSE)
 dir.create("data/raw/fire/NFD", showWarnings = FALSE)
 dir.create("data/raw/fire/NTEMS", showWarnings = FALSE)
 dir.create("data/raw/weather", showWarnings = FALSE)
+dir.create("data/raw/weather/station_data", showWarnings = FALSE)
 
 ### download 2010 Land Cover of Canada .tif
 tif_url <- "https://datacube-prod-data-public.s3.ca-central-1.amazonaws.com/store/land/landcover/landcover-2010-classification.tif"
@@ -72,6 +75,10 @@ download.file(scanfi_lc_dbf_url, "data/raw/SCANFI/scanfi_lc.tif.vat.dbf")
 
 
 ### Download water body data
+water_url <- "https://ftp.maps.canada.ca/pub/nrcan_rncan/vector/canvec/shp/Hydro/canvec_50K_NT_Hydro_shp.zip"
+download.file(water_url, "data/raw/geography/waterbodies/nwt_water.zip")
+unzip("data/raw/geography/waterbodies/nwt_names.zip", exdir = "data/raw/geography/waterbodies")
+
 
 ### Download historical fire polygons from NBAC (1972 - 2023)
 fire_year_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nbac/nbac_1972_2023_20240530_shp.zip"
@@ -99,6 +106,19 @@ unzip("data/raw/fire/NTEMS/ntems_fire_nbr.zip", exdir = "data/raw/fire/NTEMS")
 ## climate station locations
 climate_stations_url <- "https://dd.weather.gc.ca/climate/observations/climate_station_list.csv"
 download.file(climate_stations_url, "data/raw/weather/climate_station_list.csv")
-nwt_station_files <- list.files("https://dd.weather.gc.ca/climate/observations/daily/csv/NT",
-                                all.files = TRUE, full.names = TRUE)
+nwt_station_files_url <- "https://dd.weather.gc.ca/climate/observations/daily/csv/NT/"
+nwt_station_files <- RCurl::getURL(nwt_station_files_url, 
+                                   ftp.use.epsv = FALSE, dirlistonly = TRUE) %>%
+  str_extract_all("(?<=>)climate_daily_NT.*?.csv(?=<)") %>%
+  unlist() %>%
+  as_tibble() %>%
+  mutate(year = str_split_i(value, "_", 5),
+         year = substr(year,1,4),
+         year = as.numeric(year)) %>%
+  filter(year>=2007, year<=2012)
+for(i in 1:nrow(nwt_station_files)){
+  download.file(str_c(nwt_station_files_url,nwt_station_files$value[i]), 
+                str_c("data/raw/weather/station_data/",nwt_station_files$value[i]))
+}
+
 

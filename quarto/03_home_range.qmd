@@ -262,6 +262,12 @@ We can use kernel density estimates that account for these underlying movement m
 best_fit <- fit[1,]
 akde <- mapply(function(x,y){akde(x,y)},musk_tel,best_fit)
 saveRDS(akde, here("output/akde.rds"))
+akde_conts <- lapply(akde, as.sf, level.UD=0.95,level=0.95) %>%
+  bind_rows() %>%
+  mutate(Id_Number = as.numeric(str_split_i(name," ",1)),
+         type = str_split_i(name," ",3)) %>%
+  filter(type == "est")
+saveRDS(akde_conts, here("output/akde_conts.rds"))
 EXT <- lapply(akde, extent, level=0.95)
 for(i in 1:length(akde)){
   COL <- color(musk_tel[[i]],by='time')

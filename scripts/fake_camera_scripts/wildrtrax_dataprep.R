@@ -1,9 +1,9 @@
-remotes::install_github("ABbiodiversity/wildrtrax")
-library(wildrtrax)
+# remotes::install_github("ABbiodiversity/wildrtrax")
+# library(wildrtrax)
 library(tidyverse)
 
 #Authenticate in WildTrax
-Sys.setenv(WT_USERNAME = 'wildtrax_username', WT_PASSWORD = 'wildtrax_password')
+Sys.setenv(WT_USERNAME = 'niluymes', WT_PASSWORD = 'Ntu7bGdmYj89!7T')
 wt_auth(force = TRUE)
 
 # Download the tag report
