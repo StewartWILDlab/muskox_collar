@@ -53,7 +53,7 @@ rasterize_fire_year <- function(vec, year_col, date,
     rasterize(temp_rast,
               field = "year_diff",
               fun = "min",
-              background = year(date) - min_year) 
+              background = 100) 
   time(rast) <- date 
   return(rast)
 }

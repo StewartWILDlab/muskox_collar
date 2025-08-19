@@ -51,7 +51,7 @@ fire_data_subset <- fire_data_nbac_crop %>%
 saveRDS(fire_data_subset, "data/processed/fire_data_subset.rds")
 # fire_data_subset <- readRDS("data/processed/fire_data_subset.rds")
 
-### Create raster of years since fire for all years covered by muskox collar data
+### Create raster of years since fire for all years covered by muskox collar data ----
 ### create a stacked raster of years since fire
 dates <- seq(ymd("2007-01-01"), ymd("2012-01-01"), by="year")
 temp_rast <- rast(fire_data_subset, resolution = 30)
@@ -75,7 +75,7 @@ rasts <- list.files("data/processed/fire_year",
                     full.names = TRUE)
 fire_year <- rast(rasts)
 
-### create distance raster
+### create distance raster ----
 
 #Note: we use remove holes tool to identify the outer boundaries of each fire.
 fire_data_subset_fill <- fire_data_subset %>%
@@ -102,7 +102,7 @@ rasts2 <- list.files("data/processed/fire_dist",
                     full.names = TRUE)
 fire_dist <- rast(rasts2)
 
-### Load NTEMS fire NBR
+### Load NTEMS fire NBR ----
 ntems_fire_nbr <- terra::rast("data/raw/fire/NTEMS/CA_Forest_Wildfire_dNBR_1985_2020.tif")
 
 ### resize data to make subsequent analyses computationally easier
@@ -120,82 +120,4 @@ ntems_fire_nbr_proj <- crop_and_reproject_to_gps_points(
 )
 
 writeRaster(ntems_fire_nbr_proj, "data/processed/ntems_fire_nbr_proj.tif", overwrite = TRUE)
-
-
-### No Longer using fire distance rasters
-# ### create fire data rasters for different year thresholds (0-10 years, 10-25 years)
-# 
-# ### raster template
-# temp_rast <- rast(fire_data_subset, resolution = 100)
-# dates <- seq(ymd("2007-01-01"), ymd("2012-12-31"), by="week")
-# 
-# ### create and save tifs of 10 year fire data for each day from 2007 to 2012
-# map(dates, function(x){
-#   rasterize_by_date(fire_data_subset, 
-#                     datetime_col = effectdate, 
-#                     date = x, 
-#                     max_years = 10, 
-#                     min_years = 0,
-#                     temp_rast = temp_rast) %>%
-#     distance() %>%
-#     crop_and_reproject_to_gps_points(
-#       musk_collar,
-#       crs_epsg = 32609,
-#       buffer_dist = 10000) %>%
-#     save_raster_to_folder(folder_name = "fire_10year",
-#                           date = x)
-# })
-# ### combine rasters into a single raster stack
-# rasts <- list.files("data/processed/fire_10year", 
-#                     pattern = "*.tif$", 
-#                     full.names = TRUE)
-# fire_10year_stack <- rast(rasts) 
-# 
-# 
-# ### create and save tifs of 0-25 year fire data for each day from 2007 to 2012
-# map(dates, function(x){
-#   rasterize_by_date(fire_data_subset, 
-#                     datetime_col = "effectdate", 
-#                     date = x, 
-#                     max_years = 25, 
-#                     min_years = 0,
-#                     temp_rast = temp_rast) %>%
-#     distance() %>%
-#     crop_and_reproject_to_gps_points(
-#       musk_collar,
-#       crs_epsg = 32609,
-#       buffer_dist = 10000) %>%
-#     save_raster_to_folder(folder_name = "fire_25year",
-#                           date = x)
-# })
-# ### combine rasters into a single stack
-# rasts <- list.files("data/processed/fire_25year", 
-#                     pattern = "*.tif$", 
-#                     full.names = TRUE)
-# fire_25year_stack <- rast(rasts)
-# 
-# ### create and save tifs of all fires occurring after each day from 2007 to 2012
-# map(dates, function(x){
-#   rast <- rasterize_by_date(fire_data_subset, 
-#                     datetime_col = "effectdate", 
-#                     date = x, 
-#                     ## specify negative years to focus on fires occurring after each date
-#                     max_years = 0, 
-#                     min_years = -20,
-#                     temp_rast = temp_rast) %>%
-#     crop_and_reproject_to_gps_points(
-#       musk_collar,
-#       crs_epsg = 32609,
-#       buffer_dist = 10000)
-#   rast[is.na(rast)] <- 0
-#   save_raster_to_folder(rast,
-#                         folder_name = "fire_postdate",
-#                         date = x)
-# })
-# ### combine rasters into a single stack
-# rasts <- list.files("data/processed/fire_postdate", 
-#                     pattern = "*.tif$", 
-#                     full.names = TRUE)
-# fire_postdate_stack <- rast(rasts)
-
 
