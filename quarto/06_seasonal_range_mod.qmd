@@ -446,7 +446,7 @@ hr_landcover <- musk_pseudohr %>%
   map(function(.x){bind_rows(lcc_func4(.x))}) %>%
   list_rbind()
 saveRDS(hr_landcover, here("output/hr_landcover.rds"))
-
+# hr_landcover <- readRDS(here("output/hr_landcover.rds"))
 
 hr_forage <- hr_landcover %>%
   mutate(forage_lc = ifelse(cover%in%c("Temperate or sub-polar shrubland",
@@ -460,6 +460,7 @@ hr_forage <- hr_landcover %>%
                                        "Temperate or sub-polar broadleaf deciduous forest"),1,0)) %>%
   group_by(range_id, group) %>%
   summarise(total = sum(forage_lc*n+forest_lc*n),
+            n2 = sum(n),
             for_tot = sum(n*forage_lc),
             for_per = for_tot/total) 
 
@@ -504,7 +505,7 @@ musk_tpi <- musk_pseudohr %>%
   map(function(.x){tpi_func(.x, tpi_crop)}) %>%
   list_rbind()
 saveRDS(musk_tpi, here("output/musk_tpi.rds"))
-
+# musk_tpi <- readRDS(here("output/musk_tpi.rds"))
 ```
 
 ## Summer Model
@@ -659,18 +660,18 @@ sum_effects <- sum_pseudo_brm %>%
          Effect = c("Fixed", "Fixed", "Random"),
          Season = "Summer")
 wint_effects <- wint_pseudo_brm %>%
-  tidybayes::spread_draws(`Intercept`, `b_scalevalue`, 
+  tidybayes::spread_draws(`Intercept`, `b_scalevalue`, `b_scalefor_per`, 
                           `sd_Id_Number__Intercept`) %>%
   tidybayes::summarise_draws(~quantile(.x, probs = c(0.025,0.5,0.975))) %>%
-  mutate(Parameter = c("Intercept", "TPI", "sd Muskox ID"),
-         Effect = c("Fixed", "Fixed", "Random"),
+  mutate(Parameter = c("Intercept", "TPI", "Proportion \ngrassland/shrubland", "sd Muskox ID"),
+         Effect = c("Fixed", "Fixed", "Fixed", "Random"),
          Season = "Winter")
 calv_effects <- calv_pseudo_brm %>%
-  tidybayes::spread_draws(`Intercept`, `b_scalevalue`, 
+  tidybayes::spread_draws(`Intercept`, `b_scalevalue`, `b_scalefor_per`, 
                           `sd_Id_Number__Intercept`) %>%
   tidybayes::summarise_draws(~quantile(.x, probs = c(0.025,0.5,0.975))) %>%
-  mutate(Parameter = c("Intercept", "TPI", "sd Muskox ID"),
-         Effect = c("Fixed", "Fixed", "Random"),
+  mutate(Parameter = c("Intercept", "TPI", "Proportion \ngrassland/shrubland", "sd Muskox ID"),
+         Effect = c("Fixed", "Fixed", "Fixed", "Random"),
          Season = "Calving")
 
 select_mod_coefs <- bind_rows(sum_effects, wint_effects, calv_effects)
