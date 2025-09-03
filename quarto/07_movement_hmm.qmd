@@ -7,7 +7,10 @@ editor_options:
 execute: 
   warning: false
   error: false
+  eval: false
 ---
+
+\*Deprecated
 
 In this document, we will use hidden markov models to distinguish different movement behaviours of muskoxen based on step lengths and turn angles throughout the year. We will use the **momentuHMM** package to accomplish this.
 

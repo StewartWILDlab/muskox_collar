@@ -538,7 +538,7 @@ Lastly, we will fit models for the summer and winter datasets separately. Models
 ```{r}
 #| label: summer_models
 #| dependson: "combined_data"
-
+#| eval: FALSE
 
 m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
                                # scale(scanfi_prcC_end) +
@@ -628,11 +628,29 @@ m0_summer_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                              start=list(theta=c(log(1e3),rep(0,14))))
 summary(m0_summer_glmmfit_lc)
 
+saveRDS(m0_summer_glmmfit_lc, here("output/m0_summer_glmmfit_lc.rds"))
+
+
+```
+
+```{r}
+#| label: summer_models_web
+#| dependson: "combined_data"
+
+m0_summer_glmmfit <- readRDS(here("output/m0_summer_glmmfit.rds"))
+summary(m0_summer_glmmfit)
+
+# m0_summer_glmmfit_lc <- readRDS(here("output/m0_summer_glmmfit_lc.rds"))
+# summary(m0_summer_glmmfit_lc)
+
+
 ```
 
 ```{r}
 #| label: winter_models
 #| dependson: "combined_data"
+#| eval: FALSE
+
 
 m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
                                scale(mrdtm) +
@@ -712,5 +730,17 @@ m0_winter_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                 start=list(theta=c(log(1e3),rep(0,13))))
 summary(m0_winter_glmmfit_lc)
 saveRDS(m0_winter_glmmfit_lc, "output/m0_winter_glmmfit_lc.rds")
+
+```
+
+```{r}
+#| label: winter_models_web
+#| dependson: "combined_data"
+
+m0_winter_glmmfit <- readRDS(here("output/m0_winter_glmmfit.rds"))
+summary(m0_winter_glmmfit)
+
+m0_winter_glmmfit_lc <- readRDS(here("output/m0_winter_glmmfit_lc.rds"))
+summary(m0_winter_glmmfit_lc)
 
 ```

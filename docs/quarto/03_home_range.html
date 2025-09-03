@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.57">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,10 +69,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-327735d1480bff6f7510335fe22ad292.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "sidebar",
   "copy-button": false,
@@ -232,7 +232,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="03_home_range_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="03_home_range_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -261,7 +261,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="03_home_range_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="03_home_range_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -964,14 +964,20 @@ OUf anisotropic 1048.54150    0.000000 278.57428</code></pre>
 <div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>best_fit <span class="ot">&lt;-</span> fit[<span class="dv">1</span>,]</span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>akde <span class="ot">&lt;-</span> <span class="fu">mapply</span>(<span class="cf">function</span>(x,y){<span class="fu">akde</span>(x,y)},musk_tel,best_fit)</span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(akde, <span class="fu">here</span>(<span class="st">"output/akde.rds"</span>))</span>
-<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>EXT <span class="ot">&lt;-</span> <span class="fu">lapply</span>(akde, extent, <span class="at">level=</span><span class="fl">0.95</span>)</span>
-<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(akde)){</span>
-<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>  COL <span class="ot">&lt;-</span> <span class="fu">color</span>(musk_tel[[i]],<span class="at">by=</span><span class="st">'time'</span>)</span>
-<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(musk_tel[[i]],<span class="at">UD=</span>akde[[i]],</span>
-<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">xlim=</span>EXT[[i]]<span class="sc">$</span>x,<span class="at">ylim=</span>EXT[[i]]<span class="sc">$</span>y,</span>
-<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> COL, <span class="at">lwd=</span><span class="dv">4</span>);</span>
-<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">title</span>(<span class="fu">names</span>(musk_tel)[[i]])</span>
-<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>  }</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>akde_conts <span class="ot">&lt;-</span> <span class="fu">lapply</span>(akde, as.sf, <span class="at">level.UD=</span><span class="fl">0.95</span>,<span class="at">level=</span><span class="fl">0.95</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Id_Number =</span> <span class="fu">as.numeric</span>(<span class="fu">str_split_i</span>(name,<span class="st">" "</span>,<span class="dv">1</span>)),</span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">type =</span> <span class="fu">str_split_i</span>(name,<span class="st">" "</span>,<span class="dv">3</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"est"</span>)</span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(akde_conts, <span class="fu">here</span>(<span class="st">"output/akde_conts.rds"</span>))</span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>EXT <span class="ot">&lt;-</span> <span class="fu">lapply</span>(akde, extent, <span class="at">level=</span><span class="fl">0.95</span>)</span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(akde)){</span>
+<span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a>  COL <span class="ot">&lt;-</span> <span class="fu">color</span>(musk_tel[[i]],<span class="at">by=</span><span class="st">'time'</span>)</span>
+<span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(musk_tel[[i]],<span class="at">UD=</span>akde[[i]],</span>
+<span id="cb45-14"><a href="#cb45-14" aria-hidden="true" tabindex="-1"></a>       <span class="at">xlim=</span>EXT[[i]]<span class="sc">$</span>x,<span class="at">ylim=</span>EXT[[i]]<span class="sc">$</span>y,</span>
+<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> COL, <span class="at">lwd=</span><span class="dv">4</span>);</span>
+<span id="cb45-16"><a href="#cb45-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">title</span>(<span class="fu">names</span>(musk_tel)[[i]])</span>
+<span id="cb45-17"><a href="#cb45-17" aria-hidden="true" tabindex="-1"></a>  }</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -1029,14 +1035,14 @@ OUf anisotropic 1048.54150    0.000000 278.57428</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="03_home_range_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="03_home_range_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="03_home_range_files/figure-html/unnamed-chunk-14-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="03_home_range_files/figure-html/unnamed-chunk-3-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1260,8 +1266,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -1372,7 +1376,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {
