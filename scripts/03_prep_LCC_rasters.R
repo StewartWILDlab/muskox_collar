@@ -30,6 +30,7 @@ coltab <- data.frame(ids = lc_atts$Value, cols = lc_atts$hex)
 
 ### Load muskox collar data in Sahtu
 musk_collar <- readRDS("data/processed/musk_collar.rds")
+musk_aer <- readRDS("data/processed/musk_aer.rds") 
 
 ### Load land cover Canada 2010 data
 lc_2010 <- terra::rast("data/raw/landcover/landcover-2010-classification.tif")
@@ -40,6 +41,11 @@ coltab(lc_2010) <- coltab
 lc_2010_crop <- resize_raster_to_gps_points(
   lc_2010, 
   musk_collar, 
+  buffer_dist = 100000)
+
+lc_2010_crop_aer <- resize_raster_to_gps_points(
+  lc_2010, 
+  musk_aer, 
   buffer_dist = 100000)
 
 
@@ -69,6 +75,7 @@ levels(lc_2010_proj_simp) <- cats
 coltab(lc_2010_proj_simp) <- coltab
 
 writeRaster(lc_2010_crop, "data/processed/lc_2010_crop.tif", overwrite = TRUE)
+writeRaster(lc_2010_crop_aer, "data/processed/lc_2010_crop_aer.tif", overwrite = TRUE)
 writeRaster(lc_2010_proj, "data/processed/lc_2010_proj.tif", overwrite = TRUE)
 writeRaster(lc_2010_proj_simp, "data/processed/lc_2010_proj_simp.tif", overwrite = TRUE)
 

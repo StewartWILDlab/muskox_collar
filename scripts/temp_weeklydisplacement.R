@@ -17,4 +17,3 @@ temp2 <- temp %>%
          season = ifelse(month>=5&month<=10,"summer","winter")) %>%
   group_by(season) %>%
   summarise(mdisplace = median(displacement))
-

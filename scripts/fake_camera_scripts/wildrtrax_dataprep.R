@@ -1,5 +1,5 @@
-# remotes::install_github("ABbiodiversity/wildrtrax")
-# library(wildrtrax)
+remotes::install_github("ABbiodiversity/wildrtrax@development")
+library(wildrtrax)
 library(tidyverse)
 
 #Authenticate in WildTrax
@@ -7,7 +7,7 @@ Sys.setenv(WT_USERNAME = 'niluymes', WT_PASSWORD = 'Ntu7bGdmYj89!7T')
 wt_auth(force = TRUE)
 
 # Download the tag report
-images <- wt_download_report(project_id = 2431, sensor_id = 'CAM', reports = "main", weather_cols = F) %>%
+images <- wt_download_report(project_id = 2431, sensor_id = 'CAM', reports = "image_set_report", weather_cols = F) %>%
   tibble::as_tibble()
 
 # Remove non-wildlife tags
@@ -15,7 +15,7 @@ raw_data <- images %>%
   filter(species_common_name != "STAFF/SETUP", species_common_name != "NONE")
 
 # Download the location report
-cameras <- wt_download_report(project_id = 2431, sensor_id = 'CAM', reports = "location", weather_cols = F) %>%
+cameras <- wt_download_report(project_id = , sensor_id = 'CAM', reports = "location", weather_cols = F) %>%
   tibble::as_tibble() %>%
   drop_na(latitude)
 

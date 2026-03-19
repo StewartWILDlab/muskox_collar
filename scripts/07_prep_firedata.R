@@ -16,6 +16,8 @@ source("scripts/functions/raster_prep_functions.R")
 ### Load muskox collar data in Sahtu
 musk_collar <- readRDS("data/processed/musk_collar.rds") %>%
   sf::st_transform(32609)
+musk_aer <- readRDS("data/processed/musk_aer.rds") %>%
+  sf::st_transform(32609)
 
 ### Load fire data
 # fire_data <- sf::read_sf("data/raw/fire/nwt_firehistory/NWT_FireHistory_HighRes.shp") %>%
@@ -23,8 +25,15 @@ musk_collar <- readRDS("data/processed/musk_collar.rds") %>%
 fire_data_nbac <- sf::read_sf("data/raw/fire/NBAC/nbac_1972_2023_20240530.shp") 
 fire_data_nfd <- sf::read_sf("data/raw/fire/NFD/NFDB_poly_20210707.shp") 
 
-### create buffer of collar data bounding box
+### create buffer of collar and aerial data bounding boxes
 buffer <- musk_collar %>%
+  sf::st_bbox() %>%
+  sf::st_as_sfc() %>%
+  sf::st_buffer(50000) %>%
+  sf::st_bbox() %>%
+  sf::st_as_sfc()
+
+buffer_aer <- musk_aer %>%
   sf::st_bbox() %>%
   sf::st_as_sfc() %>%
   sf::st_buffer(50000) %>%
@@ -37,8 +46,16 @@ fire_data_nbac_crop <- fire_data_nbac %>%
   sf::st_intersection(buffer %>% st_transform(st_crs(fire_data_nbac))) %>%
   sf::st_transform(32609)
 
+fire_data_nbac_crop_aer <- fire_data_nbac %>%
+  sf::st_intersection(buffer_aer %>% st_transform(st_crs(fire_data_nbac))) %>%
+  sf::st_transform(32609)
+
 fire_data_nfd_crop <- fire_data_nfd %>%
   sf::st_intersection(buffer %>% st_transform(st_crs(fire_data_nfd))) %>%
+  sf::st_transform(32609)
+
+fire_data_nfd_crop_aer <- fire_data_nfd %>%
+  sf::st_intersection(buffer_aer %>% st_transform(st_crs(fire_data_nfd))) %>%
   sf::st_transform(32609)
 
 ### combine cropped fire data
@@ -48,7 +65,13 @@ fire_data_subset <- fire_data_nbac_crop %>%
   rename(fireyear = YEAR) 
   # mutate(effectdate = as.POSIXct(effectdate))
 
+fire_data_subset_aer <- fire_data_nbac_crop_aer %>%
+  bind_rows(fire_data_nfd_crop_aer %>%
+              filter(YEAR < 1972)) %>%
+  rename(fireyear = YEAR) 
+
 saveRDS(fire_data_subset, "data/processed/fire_data_subset.rds")
+saveRDS(fire_data_subset_aer, "data/processed/fire_data_subset_aer.rds")
 # fire_data_subset <- readRDS("data/processed/fire_data_subset.rds")
 
 ### Create raster of years since fire for all years covered by muskox collar data ----

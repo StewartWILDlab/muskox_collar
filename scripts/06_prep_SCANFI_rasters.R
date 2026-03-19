@@ -70,5 +70,9 @@ writeRaster(biomass_2020_proj, "data/processed/biomass_2020_proj.tif", overwrite
 writeRaster(lc_2020_crop, "data/processed/lc_2020_crop.tif", overwrite = TRUE)
 writeRaster(lc_2020_proj, "data/processed/lc_2020_proj.tif", overwrite = TRUE)
 
+# prcC_2020_proj <- rast("data/processed/prcC_2020_proj.tif")
+
 ggplot() +
-  tidyterra::geom_spatraster(data = prcC_2020_proj)
+  tidyterra::geom_spatraster(data = prcC_2020_proj) +
+  geom_sf(data = musk_collar %>%
+               filter(month<=3))

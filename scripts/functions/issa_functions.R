@@ -40,6 +40,8 @@ generate_data_for_issa_predictions <- function(issa_model, data, covariate = NA)
   return(new_data)
 }
 
+
+
 generate_issa_predictions <- function(issa_model, data, covariate = NA){
   newdata <- generate_data_for_issa_predictions(issa_model, data, covariate = NA)
   preds <- predict(issa_model,
@@ -52,4 +54,70 @@ generate_issa_predictions <- function(issa_model, data, covariate = NA){
   return(output)
 }
 
-generate_issa_predictions(m0_summer_glmmfit, issa_data_summer_comb, NA)  
+## Tidy model results and identify model terms
+extract_model_coefs <- function(model){
+  coefficients <- broom.mixed::tidy(model) %>%
+    select(-group, -statistic, -p.value) %>%
+    mutate(term = str_remove(term, "sd__")) %>%
+    pivot_wider(names_from = effect, values_from = c(estimate, std.error)) %>%
+    filter(term != "(Intercept)") %>%
+    mutate(variable = str_remove_all(term, "scale\\("),
+           variable = str_remove_all(variable, "\\)"),
+           variable = str_replace(variable, ":", "*"))
+  return(coefficients)
+}
+  
+## Convert model terms back to variable names used in datasets
+extract_model_variables <- function(coefficients){
+  vars <- tibble(par = coefficients$term) %>%
+    mutate(variable = str_split(par, ":")) %>%
+    unnest(variable) %>%
+    mutate(scale = str_detect(variable, "scale"),
+           variable = str_remove_all(variable, "scale\\("),
+           variable = str_remove_all(variable, "\\)")) %>%
+    select(variable, scale) %>%
+    distinct()
+  return(vars)
+}
+
+## Scale relevant variables
+scale_data <- function(data, variables){
+  new_data <- data %>%
+    select(id, step_id_, case_, variables$variable) %>%
+    mutate(across(variables %>% filter(scale == TRUE) %>% pull(variable), ~scale(.x)[,1]))
+  return(new_data)
+}  
+
+generate_uhc_predictions <- function(model, data, test_collars, nsim = 100) {
+  coefs <- extract_model_coefs(model)
+  vars <- extract_model_variables(coefs)
+  new_data <- scale_data(data, vars) %>%
+    filter(id %in% test_collars)
+
+  preds = list()
+  preds[[1]] <- new_data %>%
+    mutate(data = "observed") %>%
+    filter(case_ == TRUE)
+  for(i in 2:(nsim+1)){
+    new_coefs <- coefs %>%
+      mutate(new_est = rnorm(n(), estimate_fixed, std.error_fixed),
+             new_est_r = rnorm(n(), new_est, estimate_ran_pars),
+             formula = str_c(new_est_r, "*", variable))
+    formula = str_c(new_coefs$formula, collapse = " + ")
+    variables = str_c(vars$variable, collapse = ", ")
+    func_string = str_c("function(",variables,"){", formula,"}")
+    func = eval(parse(text = func_string))
+    preds[[i]] <- new_data %>%
+      mutate(pred = pmap_dbl(new_data %>% select(vars$variable), func),
+             sim = i,
+             data = "simulation") %>%
+      group_by(id, step_id_) %>%
+      mutate(pred_standard = exp(pred)/sum(exp(pred), na.rm = TRUE)) %>%
+      slice_sample(n = 1, weight_by = pred_standard)
+  }
+  boot_preds <- bind_rows(preds)
+  return(boot_preds)
+}
+  
+    
+

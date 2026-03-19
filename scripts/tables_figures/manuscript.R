@@ -247,17 +247,21 @@ par_lut <- tibble(
               'Wetland', 'fire_10_low', 'fire_10_mod', 'fire_10_high', 
               'fire_20_low', 'fire_20_mod', 'fire_20_high', 'fire_30', 
               'fire_40', 'scale(log_sl):scale(cos_ta)', 
-              'scale(log_fire_dist):fire_10', 'scale(log_fire_dist):fire_20',
-              'scale(log_fire_dist):fire_30', 'scale(log_fire_dist):fire_40',
-              'scale(log_sl):scale(avg_max_temp)',
-              'scale(avg_max_temp):scale(log_sl)',
+              'scale(log_fire_dist):fire_10_dup', 'scale(log_fire_dist):fire_20_dup',
+              'scale(log_fire_dist):fire_30_dup', 'scale(log_fire_dist):fire_40_dup',
+              'scale(log_sl):scale(avg_max_temp_1)',
+              'scale(log_sl):scale(avg_max_temp_2)',
+              'scale(avg_max_temp_1):scale(log_sl)',
+              'scale(avg_max_temp_2):scale(log_sl)',
               'Sub_polar_taiga_needleleaf_forest', 
               'Temperate_or_sub_polar_shrubland', 
               'Temperate_or_sub_polar_grassland', 'Barren_Lands',
-              'scale(log_sl):scale(avg_min_temp)',
+              'scale(log_sl):scale(avg_min_temp_1)',
+              'scale(log_sl):scale(avg_min_temp_2)',
               'scale(log_sl):scale(snow_depth)',
               'scale(snow_depth):scale(log_sl)',
-              'scale(avg_min_temp):scale(log_sl)',
+              'scale(avg_min_temp_1):scale(log_sl)',
+              'scale(avg_min_temp_2):scale(log_sl)',
               'scale(log_water_dist)',
               'Sub_polar_taiga_needleleaf_forest:calving', 
               'Temperate_or_sub_polar_shrubland:calving', 
@@ -280,13 +284,17 @@ par_lut <- tibble(
            "Distance to fire edge:21-30 year old fire",
            "Distance to fire edge:31-40 year old fire",
            "Step length:Max daily temperature",
+           "Step length:Max daily temperature^2",
            "Step length:Max daily temperature",
+           "Step length:Max daily temperature^2",
            "Sub-polar taiga needleleaf forest", 
            "Temperate or sub-polar shrubland", 
            "Temperate or sub-polar grassland", "Barren Lands",
            "Step length:Min daily temperature",
+           "Step length:Min daily temperature^2",
            "Step length:Snow depth","Step length:Snow depth",
            "Step length:Min daily temperature",
+           "Step length:Min daily temperature^2",
            "Distance to waterbody",
            "Sub-polar taiga needleleaf forest:Calving season", 
            "Temperate or sub-polar shrubland:Calving season", 
@@ -322,7 +330,9 @@ par_order <- c("TRI", "TPI", "Waterbody", "Distance to waterbody",
                "Step length", "Step length:Calving season", "Cosine turning angle",
                "Step length:Cosine turning angle",
                "Step length:Max daily temperature",
+               "Step length:Max daily temperature^2",
                "Step length:Min daily temperature",
+               "Step length:Min daily temperature^2",
                "Step length:Snow depth")
 
 
@@ -398,7 +408,8 @@ fireyear_summer_data <- issa_data_summer_comb %>%
                     mrdtm = mean(mrdtm),
                     water = 0,
                     Wetland = 0,
-                    avg_max_temp = mean(avg_max_temp),
+                    avg_max_temp_1 = mean(avg_max_temp_1),
+                    avg_max_temp_2 = mean(avg_max_temp_2),
                     fire_cat = c("fire_10_low", "fire_10_mod", "fire_10_high",
                                  "fire_20_low", "fire_20_mod", "fire_20_high",
                                  "fire_30", "fire_40"),
@@ -493,7 +504,8 @@ firedist_summer_data <- issa_data_summer_comb %>%
                     mrdtm = mean(mrdtm),
                     water = 0,
                     Wetland = 0,
-                    avg_max_temp = mean(avg_max_temp),
+                    avg_max_temp_1 = mean(avg_max_temp_1),
+                    avg_max_temp_2 = mean(avg_max_temp_2),
                     fire_10_low = 0,
                     fire_10_mod = 0,
                     fire_10_high = 0,
@@ -579,7 +591,8 @@ lc_winter_data <- issa_data_winter_comb %>%
                     tpi = mean(tpi),
                     mrdtm = mean(mrdtm),
                     snow_depth = mean(snow_depth),
-                    avg_min_temp = mean(avg_max_temp),
+                    avg_min_temp_1 = mean(avg_min_temp_1),
+                    avg_min_temp_2 = mean(avg_min_temp_2),
                     lc_cat = c('Sub_polar_taiga_needleleaf_forest', 
                                  'Temperate_or_sub_polar_shrubland', 
                                  'Temperate_or_sub_polar_grassland', 
@@ -661,7 +674,7 @@ ggsave("output/figures/lc_rss.png", width = 6, height = 4)
 ### Step length RSS plot ----
 
 summer_base_data <- issa_data_summer_comb %>%
-  modelr::data_grid(log_sl = mean(log_sl),
+  modelr::data_grid(sl_ = mean(sl_),
                     cos_ta = mean(cos_ta),
                     log_water_dist = mean(log_water_dist),
                     log_fire_dist = mean(log_fire_dist),
@@ -684,14 +697,20 @@ summer_base_data <- issa_data_summer_comb %>%
                     fire_40_dup = 0,
                     strat_id = NA,
                     id = c(as.character(id),"newid")
-  ) 
+  ) %>%
+  mutate(log_sl = log(sl_))
 
 steplen_summer_data <- summer_base_data %>%
-  select(-avg_max_temp, -log_sl) %>%
+  select(-avg_max_temp, -sl_) %>%
   expand_grid(
-    log_sl = modelr::seq_range(issa_data_summer_comb$log_sl,30),
+    sl_ = modelr::seq_range(issa_data_summer_comb$sl_,30,trim = 0.1),
     avg_max_temp = c(0, 10, 20)) %>%
-  mutate(condition = "Daily temperature") %>%
+  mutate(condition = "Daily temperature",
+         avg_max_temp_poly = predict(issa_data_summer_comb$avg_max_temp_poly, 
+                                     avg_max_temp),
+         avg_max_temp_1 = avg_max_temp_poly[,1],
+         avg_max_temp_2 = avg_max_temp_poly[,2],
+         log_sl = log(sl_)) %>%
   arrange(id)
 
 steplen_summer_pred_id <- predict(m0_summer_glmmfit, 
@@ -700,7 +719,7 @@ steplen_summer_pred_id <- predict(m0_summer_glmmfit,
                                   type = "link",
                                   re.form = NULL,
                                   allow.new.levels=TRUE,
-                                  se.fit = TRUE)
+                                  se.fit = FALSE)
 steplen_summer_pred_newid <- predict(m0_summer_glmmfit, 
                                 newdata = steplen_summer_data %>%
                                   filter(id == "newid"),
@@ -710,13 +729,14 @@ steplen_summer_pred_newid <- predict(m0_summer_glmmfit,
                                 se.fit = TRUE)
 
 winter_base_data <- issa_data_winter_comb %>%
-  modelr::data_grid(log_sl = mean(log_sl),
+  modelr::data_grid(sl_ = mean(sl_),
                     cos_ta = mean(cos_ta),
                     log_water_dist = mean(log_water_dist),
                     tpi = mean(tpi),
                     mrdtm = mean(mrdtm),
                     snow_depth = mean(snow_depth),
-                    avg_min_temp = mean(avg_min_temp),
+                    avg_min_temp_1 = mean(avg_min_temp_1),
+                    avg_min_temp_2 = mean(avg_min_temp_2),
                     Sub_polar_taiga_needleleaf_forest = 0,
                     Temperate_or_sub_polar_shrubland = 0,
                     Temperate_or_sub_polar_grassland = 0,
@@ -727,21 +747,28 @@ winter_base_data <- issa_data_winter_comb %>%
                     calving = 0,
                     strat_id = NA,
                     id = c(as.character(id),"newid")
-  )
+  ) %>%
+  mutate(log_sl = log(sl_))
 
 steplen_winter_data <- winter_base_data %>%
-  select(-avg_min_temp, -log_sl) %>%
+  select(-avg_min_temp_1, -avg_min_temp_2, -sl_) %>%
   expand_grid(
-    log_sl = modelr::seq_range(issa_data_winter_comb$log_sl,30),
+    sl_ = modelr::seq_range(issa_data_winter_comb$sl_,30, trim = 0.1),
     avg_min_temp = c(-40, -20, 0)) %>%
-  mutate(condition = "Daily temperature") %>%
+  mutate(condition = "Daily temperature",
+         avg_min_temp_poly = predict(issa_data_winter_comb$avg_min_temp_poly, 
+                                     avg_min_temp),
+         avg_min_temp_1 = avg_min_temp_poly[,1],
+         avg_min_temp_2 = avg_min_temp_poly[,2],
+         log_sl = log(sl_)) %>%
   bind_rows(
     winter_base_data %>%
-      select(-snow_depth, -log_sl) %>%
+      select(-snow_depth, -sl_) %>%
       expand_grid(
-        log_sl = modelr::seq_range(issa_data_winter_comb$log_sl,30),
+        sl_ = modelr::seq_range(issa_data_winter_comb$sl_,30, trim = 0.1),
         snow_depth = c(0, 0.2, 0.4)) %>%
-      mutate(condition = "Snow depth")
+      mutate(condition = "Snow depth",
+             log_sl = log(sl_))
   ) %>%
   arrange(id)
 
@@ -752,7 +779,7 @@ steplen_winter_pred_id <- predict(m0_winter_glmmfit_lc,
                              type = "link",
                              re.form = NULL,
                              allow.new.levels=TRUE,
-                             se.fit = TRUE)
+                             se.fit = FALSE)
 steplen_winter_pred_newid <- predict(m0_winter_glmmfit_lc, 
                                 newdata = steplen_winter_data %>%
                                   filter(id == "newid"),
@@ -762,16 +789,16 @@ steplen_winter_pred_newid <- predict(m0_winter_glmmfit_lc,
                                 se.fit = TRUE)
 
 steplen_rss <- steplen_winter_data %>%
-  mutate(pred = c(steplen_winter_pred_id$fit,
+  mutate(pred = c(steplen_winter_pred_id,
                   steplen_winter_pred_newid$fit),
-         se = c(steplen_winter_pred_id$se.fit,
+         se = c(rep(NA, length(steplen_winter_pred_id)),
                 steplen_winter_pred_newid$se.fit),
          season = "Winter") %>%
   bind_rows(
     steplen_summer_data %>%
-      mutate(pred = c(steplen_summer_pred_id$fit,
+      mutate(pred = c(steplen_summer_pred_id,
                       steplen_summer_pred_newid$fit),
-             se = c(steplen_summer_pred_id$se.fit,
+             se = c(rep(NA,length(steplen_summer_pred_id)),
                     steplen_summer_pred_newid$se.fit),
              season = "Summer")
   ) %>%
@@ -805,7 +832,7 @@ wint_snow <- ggplot(data = steplen_rss %>% filter(id == "newid",
   ylab("Relative selection strength") +
   ggtitle("Winter - Snow depth") +
   scale_y_log10(labels = scales::comma,
-                limits = c(0.01,1000)) +
+                limits = c(0.1,10)) +
   theme_proj 
 
 wint_temp <- ggplot(data = steplen_rss %>% filter(id == "newid",
@@ -825,7 +852,7 @@ wint_temp <- ggplot(data = steplen_rss %>% filter(id == "newid",
   ylab("Relative selection strength") +
   ggtitle("Winter - Daily temperature") +
   scale_y_log10(labels = scales::comma,
-                limits = c(0.01,500)) +
+                limits = c(0.1,10)) +
   theme_proj 
 
 summ_temp <- ggplot(data = steplen_rss %>% filter(id == "newid",
@@ -844,8 +871,9 @@ summ_temp <- ggplot(data = steplen_rss %>% filter(id == "newid",
   xlab("Step length") + 
   ylab("Relative selection strength") +
   ggtitle("Summer - Daily temperature") +
-  scale_y_log10() +
-  theme_proj 
+  scale_y_log10(labels = scales::comma,
+                limits = c(0.1,10)) +
+  theme_proj
 
 ggpubr::ggarrange(summ_temp, wint_temp, wint_snow, nrow = 3,
                   labels = c("A", "B", "C"))
@@ -853,5 +881,213 @@ ggpubr::ggarrange(summ_temp, wint_temp, wint_snow, nrow = 3,
 ggsave("output/figures/step_rss.png", width = 6, height = 8)
 
 
+### Fire and landcover plot----
+fire_2010 <- terra::rast("data/processed/fire_year/2010-01-01.tif")
+nbr_proj <- terra::rast("data/processed/ntems_fire_nbr_proj.tif")
+lc_2010_proj <- terra::rast("data/processed/lc_2010_proj.tif")
+
+fire_2010_resamp <- resample(fire_2010, lc_2010_proj, method = "near")
+reclass <- c(0,10,10,
+             10,20,20,
+             20,30,30,
+             30,40,40,
+             40,110,50)
+reclass_m <- matrix(reclass, ncol = 3, byrow = TRUE)
+fire_2010_cat <- classify(fire_2010_resamp, reclass_m, include.lowest = TRUE)
+
+fire_cat_sum <- crosstab(c(fire_2010_cat, lc_2010_proj)) %>%
+  as_tibble()
+
+cols <- levels(lc_2010_proj)[[1]] %>%
+  left_join(coltab(lc_2010_proj)[[1]]) %>%
+  mutate(rgb = rgb(red, green, blue, maxColorValue = 255))
+
+fire_cat_props <- fire_cat_sum %>%
+  filter(cover != "Snow and Ice") %>%
+  group_by(year_diff, cover) %>%
+  summarise(n = sum(n)) %>%
+  group_by(year_diff) %>%
+  mutate(p = n/sum(n)) %>%
+  ungroup() %>%
+  group_by(cover) %>%
+  mutate(max_p = max(p)) %>%
+  ungroup() %>%
+  mutate(cover = ifelse(max_p<0.01,"Other", cover),
+         cover = factor(cover, levels = c(cols$cover,"Other")))
+
+cols2 <- cols %>%
+  filter(cover %in% fire_cat_props$cover)
+
+fire_cat_props %>%
+  ggplot(aes(x = year_diff, y = p, fill = cover)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(labels = c("1 - 10", "11 - 20",
+                              "21 - 30", "31 - 40",
+                              ">40/unburned")) +
+  xlab("Years since fire") + 
+  ylab("Percent cover") +
+  labs(fill = "Land Cover of Canada") +
+  scale_fill_manual(values = c(cols2$rgb, "brown")) +
+  theme_proj
+
+ggsave("output/figures/fire_lc.png", width = 8, height = 4)
+
+### TRI and TPI predictions ----
+tpi_summer_data <- issa_data_summer_comb %>%
+  modelr::data_grid(sl_ = mean(sl_),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    log_fire_dist = mean(log_fire_dist),
+                    tpi = c(0, 20),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    Wetland = 0,
+                    avg_max_temp = mean(avg_max_temp),
+                    fire_10_low = 0,
+                    fire_10_mod = 0,
+                    fire_10_high = 0,
+                    fire_20_low = 0,
+                    fire_20_mod = 0,
+                    fire_20_high = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,
+                    fire_10_dup = 0,
+                    fire_20_dup = 0,
+                    fire_30_dup = 0,
+                    fire_40_dup = 0,
+                    strat_id = NA,
+                    id = as.character(id)
+  ) %>%
+  mutate(condition = "Daily temperature",
+         avg_max_temp_poly = predict(issa_data_summer_comb$avg_max_temp_poly, 
+                                     avg_max_temp),
+         avg_max_temp_1 = avg_max_temp_poly[,1],
+         avg_max_temp_2 = avg_max_temp_poly[,2],
+         log_sl = log(sl_)) %>%
+  arrange(id)
+
+tpi_summer_pred_newid <- predict(m0_summer_glmmfit, 
+                                     newdata = tpi_summer_data,
+                                     type = "link",
+                                     # re.form = NA,
+                                     allow.new.levels=TRUE,
+                                     se.fit = FALSE)
+
+exp(tpi_summer_pred_newid)
 
 
+tpi_winter_data <- issa_data_winter_comb %>%
+  modelr::data_grid(sl_ = mean(sl_),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = c(0,20),
+                    mrdtm = mean(mrdtm),
+                    snow_depth = mean(snow_depth),
+                    avg_min_temp = mean(avg_min_temp),
+                    Sub_polar_taiga_needleleaf_forest = 0,
+                    Temperate_or_sub_polar_shrubland = 0,
+                    Temperate_or_sub_polar_grassland = 0,
+                    Barren_Lands = 0,
+                    Mixed_forest = 0,
+                    Wetland = 0,
+                    water = 0,
+                    calving = 0,
+                    strat_id = NA,
+                    id = as.character(id)
+  ) %>%
+  mutate(avg_min_temp_poly = predict(issa_data_winter_comb$avg_min_temp_poly, 
+                                     avg_min_temp),
+         avg_min_temp_1 = avg_min_temp_poly[,1],
+         avg_min_temp_2 = avg_min_temp_poly[,2],
+         log_sl = log(sl_)) %>%
+  arrange(id)
+
+
+
+tpi_winter_pred_newid <- predict(m0_winter_glmmfit_lc, 
+                                     newdata = tpi_winter_data,
+                                     type = "link",
+                                     # re.form = NA,
+                                     allow.new.levels=TRUE,
+                                     se.fit = FALSE)
+exp(tpi_winter_pred_newid)
+
+### Turning angle predictions ----
+tpi_summer_data <- issa_data_summer_comb %>%
+  modelr::data_grid(sl_ = mean(sl_),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    log_fire_dist = mean(log_fire_dist),
+                    tpi = mean(tpi),
+                    mrdtm = mean(mrdtm),
+                    water = 0,
+                    Wetland = 0,
+                    avg_max_temp = mean(avg_max_temp),
+                    fire_10_low = 0,
+                    fire_10_mod = 0,
+                    fire_10_high = 0,
+                    fire_20_low = 0,
+                    fire_20_mod = 0,
+                    fire_20_high = 0,
+                    fire_30 = 0,
+                    fire_40 = 0,
+                    fire_10_dup = 0,
+                    fire_20_dup = 0,
+                    fire_30_dup = 0,
+                    fire_40_dup = 0,
+                    strat_id = NA,
+                    id = as.character(id)
+  ) %>%
+  mutate(condition = "Daily temperature",
+         avg_max_temp_poly = predict(issa_data_summer_comb$avg_max_temp_poly, 
+                                     avg_max_temp),
+         avg_max_temp_1 = avg_max_temp_poly[,1],
+         avg_max_temp_2 = avg_max_temp_poly[,2],
+         log_sl = log(sl_)) %>%
+  arrange(id)
+
+tpi_summer_pred_newid <- predict(m0_summer_glmmfit, 
+                                 newdata = tpi_summer_data,
+                                 type = "link",
+                                 # re.form = NA,
+                                 allow.new.levels=TRUE,
+                                 se.fit = FALSE)
+
+exp(tpi_summer_pred_newid)
+
+
+tpi_winter_data <- issa_data_winter_comb %>%
+  modelr::data_grid(sl_ = mean(sl_),
+                    cos_ta = mean(cos_ta),
+                    log_water_dist = mean(log_water_dist),
+                    tpi = c(0,20),
+                    mrdtm = mean(mrdtm),
+                    snow_depth = mean(snow_depth),
+                    avg_min_temp = mean(avg_min_temp),
+                    Sub_polar_taiga_needleleaf_forest = 0,
+                    Temperate_or_sub_polar_shrubland = 0,
+                    Temperate_or_sub_polar_grassland = 0,
+                    Barren_Lands = 0,
+                    Mixed_forest = 0,
+                    Wetland = 0,
+                    water = 0,
+                    calving = 0,
+                    strat_id = NA,
+                    id = as.character(id)
+  ) %>%
+  mutate(avg_min_temp_poly = predict(issa_data_winter_comb$avg_min_temp_poly, 
+                                     avg_min_temp),
+         avg_min_temp_1 = avg_min_temp_poly[,1],
+         avg_min_temp_2 = avg_min_temp_poly[,2],
+         log_sl = log(sl_)) %>%
+  arrange(id)
+
+
+
+tpi_winter_pred_newid <- predict(m0_winter_glmmfit_lc, 
+                                 newdata = tpi_winter_data,
+                                 type = "link",
+                                 # re.form = NA,
+                                 allow.new.levels=TRUE,
+                                 se.fit = FALSE)
+exp(tpi_winter_pred_newid)

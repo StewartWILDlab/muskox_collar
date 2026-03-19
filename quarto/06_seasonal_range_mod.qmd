@@ -508,6 +508,22 @@ saveRDS(musk_tpi, here("output/musk_tpi.rds"))
 # musk_tpi <- readRDS(here("output/musk_tpi.rds"))
 ```
 
+```{r}
+#| label: canopy_pseudo
+#| dependson: "tpi_pseudo"
+#| echo: FALSE
+
+### Removed, could not find any reason to suggest canopy cover was signifcantly selected in winter
+# prcC_2020_crop <- rast("data/processed/prcC_2020_crop.tif")
+# 
+# musk_canopy <- musk_pseudohr %>%
+#   pull(range_id) %>%
+#   map(function(.x){tpi_func(.x, prcC_2020_crop)}) %>%
+#   list_rbind()
+# saveRDS(musk_canopy, here("output/musk_canopy.rds"))
+
+```
+
 ## Summer Model
 
 ```{r}

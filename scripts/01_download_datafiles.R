@@ -32,9 +32,9 @@ meta_url <- "https://open.canada.ca/data/en/dataset/c688b87f-e85f-4842-b0e1-a8f7
 download.file(meta_url, "data/raw/landcover/landcover-2010-classification.tif2.xml")
 
 ### download Medium Resolution Digital Elevation Model (MRDEM) from Govt of Canada
-dem_url <- "https://datacube-prod-data-public.s3.ca-central-1.amazonaws.com/store/elevation/mrdem/mrdem-30/mrdem-30-dtm.tif"
+dem_url <- "https://canelevation-dem.s3.ca-central-1.amazonaws.com/mrdem-30/mrdem-30-dtm.vrt"
 options(timeout = max(2000, getOption("timeout")))
-download.file(dem_url, "data/raw/MRDEM/mrdtm.tif", mode = "wb")
+download.file(dem_url, "data/raw/MRDEM/mrdtm.vrt", mode = "wb")
 
 ### download DEM metadata
 dem_meta_url <- "https://open.canada.ca/data/en/dataset/18752265-bda3-498c-a4ba-9dfe68cb98da.xml"

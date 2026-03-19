@@ -322,7 +322,7 @@ issa_bursts_summer <- issa_track_nest %>%
       ),
     rand_steps = map(steps, function(x){
       set.seed(5)
-      x %>% random_steps(n_control = 10)
+      x %>% random_steps(n_control = 20)
       })
   )
 
@@ -339,7 +339,7 @@ issa_bursts_winter <- issa_track_nest %>%
       ),
     rand_steps = map(steps, function(x){
       set.seed(5)
-      x %>% random_steps(n_control = 10)
+      x %>% random_steps(n_control = 20)
       })
   )
 
@@ -445,6 +445,9 @@ issa_data_summer_comb <- list_rbind(issa_data_summer$data_covs) %>%
   mutate(log_water_dist = log(layer/30+1),
          log_ridge_dist = log(ridge_dist/30+1),
          log_fire_dist = log(fire_dist/30+1),
+         avg_max_temp_poly = poly(avg_max_temp,2),
+         avg_max_temp_1 = avg_max_temp_poly[,1],
+         avg_max_temp_2 = avg_max_temp_poly[,2],
          water = ifelse(focal_modal == "Water",1,0),
          ridge = ifelse(ridge_dist == 0,1,0),
          nbr = replace_na(nbr,0),
@@ -497,6 +500,9 @@ issa_data_winter_comb <- list_rbind(issa_data_winter$data_covs) %>%
   mutate(log_water_dist = log(layer/100+1),
          log_ridge_dist = log(ridge_dist/30+1),
          log_fire_dist = log(fire_dist/30+1),
+         avg_min_temp_poly = poly(avg_min_temp,2),
+         avg_min_temp_1 = avg_min_temp_poly[,1],
+         avg_min_temp_2 = avg_min_temp_poly[,2],
          ridge = ifelse(ridge_dist == 0,1,0),
          water = ifelse(focal_modal == "Water",1,0),
          ### only 3-4 potentital steps in fires aged <10 years
@@ -541,6 +547,7 @@ Lastly, we will fit models for the summer and winter datasets separately. Models
 #| eval: FALSE
 
 m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                               scale(sl_) +
                                # scale(scanfi_prcC_end) +
                                scale(mrdtm) +
                                scale(log_water_dist) +
@@ -561,9 +568,11 @@ m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                fire_30 +
                                fire_40 +
                                # fire_50 +
-                               scale(avg_max_temp):scale(log_sl) +
+                               scale(log_sl):scale(avg_max_temp_1) +
+                               scale(log_sl):scale(avg_max_temp_2) +
                                (1|strat_id) +
                                (0 + scale(log_sl)|id) +
+                               (0 + scale(sl_)|id) +
                                (0 + scale(cos_ta)|id) +
                                (0 + scale(log_sl):scale(cos_ta)|id) +
                                (0 + scale(tpi)|id) +
@@ -585,11 +594,12 @@ m0_summer_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                (0 + fire_30|id) +
                                (0 + fire_40|id) +
                                # (0 + fire_50|id) +
-                               (0 + scale(avg_max_temp):scale(log_sl)|id), 
+                               (0 + scale(log_sl):scale(avg_max_temp_1)|id) +
+                               (0 + scale(log_sl):scale(avg_max_temp_2)|id), 
                              family = poisson,
                              data = issa_data_summer_comb,
-                             map=list(theta=factor(c(NA,1:21))),
-                             start=list(theta=c(log(1e3),rep(0,21))))
+                             map=list(theta=factor(c(NA,1:23))),
+                             start=list(theta=c(log(1e3),rep(0,23))))
 summary(m0_summer_glmmfit)
 
 saveRDS(issa_data_summer_comb, here("data/processed/issa_data_summer_comb.rds"))
@@ -597,6 +607,7 @@ saveRDS(issa_data_summer_comb, here("data/processed/issa_data_summer_comb.rds"))
 saveRDS(m0_summer_glmmfit, here("output/m0_summer_glmmfit.rds"))
 
 m0_summer_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                                  scale(sl_) +
                                # scale(scanfi_prcC_end) +
                                scale(mrdtm) +
                                scale(tpi) +
@@ -605,9 +616,11 @@ m0_summer_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                Temperate_or_sub_polar_grassland +
                                Wetland +
                                Barren_Lands +
-                               scale(avg_max_temp):scale(log_sl) +
+                               scale(avg_max_temp_1):scale(log_sl) +
+                               scale(avg_max_temp_2):scale(log_sl) +
                                (1|strat_id) +
                                (0 + scale(log_sl)|id) +
+                               (0 + scale(sl_)|id) +
                                (0 + scale(cos_ta)|id) +
                                (0 + scale(log_sl):scale(cos_ta)|id) +
                                # (0 + scale(scanfi_prcC_end)|id) +
@@ -621,14 +634,35 @@ m0_summer_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                (0 + Mixed_forest|id) +
                                (0 + Wetland|id) +
                                (0 + Barren_Lands|id) +
-                               (0 + scale(avg_max_temp):scale(log_sl)|id), 
+                               (0 + scale(avg_max_temp_1):scale(log_sl)|id)+
+                               (0 + scale(avg_max_temp_2):scale(log_sl)|id), 
+                             family = poisson,
+                             data = issa_data_summer_comb,
+                             map=list(theta=factor(c(NA,1:16))),
+                             start=list(theta=c(log(1e3),rep(0,16))))
+summary(m0_summer_glmmfit_lc)
+
+saveRDS(m0_summer_glmmfit_lc, here("output/m0_summer_glmmfit_lc.rds"))
+
+m0_summer_glmmfit_null <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                                    scale(sl_) +
+                               scale(mrdtm) +
+                               scale(tpi) +
+                               scale(avg_max_temp_1):scale(log_sl) +
+                               scale(avg_max_temp_2):scale(log_sl) +
+                               (1|strat_id) +
+                               (0 + scale(log_sl)|id) +
+                               (0 + scale(sl_)|id) +
+                               (0 + scale(cos_ta)|id) +
+                               (0 + scale(log_sl):scale(cos_ta)|id) +
+                               (0 + scale(tpi)|id) +
+                               (0 + scale(avg_max_temp_1):scale(log_sl)|id)+
+                               (0 + scale(avg_max_temp_2):scale(log_sl)|id), 
                              family = poisson,
                              data = issa_data_summer_comb,
                              map=list(theta=factor(c(NA,1:14))),
                              start=list(theta=c(log(1e3),rep(0,14))))
-summary(m0_summer_glmmfit_lc)
-
-saveRDS(m0_summer_glmmfit_lc, here("output/m0_summer_glmmfit_lc.rds"))
+summary(m0_summer_glmmfit_null)
 
 
 ```
@@ -639,7 +673,7 @@ saveRDS(m0_summer_glmmfit_lc, here("output/m0_summer_glmmfit_lc.rds"))
 
 m0_summer_glmmfit <- readRDS(here("output/m0_summer_glmmfit.rds"))
 summary(m0_summer_glmmfit)
-
+  
 # m0_summer_glmmfit_lc <- readRDS(here("output/m0_summer_glmmfit_lc.rds"))
 # summary(m0_summer_glmmfit_lc)
 
@@ -653,6 +687,7 @@ summary(m0_summer_glmmfit)
 
 
 m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                               scale(sl_) +
                                scale(mrdtm) +
                                scale(tpi) +
                                # scale(log_water_dist) +
@@ -664,9 +699,11 @@ m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                # fire_40:scale(log_fire_dist) +
                                calving:scale(log_sl) +
                                scale(snow_depth):scale(log_sl) +
-                               scale(avg_min_temp):scale(log_sl) +
+                               scale(avg_min_temp_1):scale(log_sl) +
+                               scale(avg_min_temp_2):scale(log_sl) +
                                (1|strat_id) +
                                (0 + scale(log_sl)|id) +
+                               (0 + scale(sl_)|id) +
                                (0 + scale(cos_ta)|id) +
                                (0 + scale(log_sl):scale(cos_ta)|id) +
                                # (0 + water|id) +
@@ -675,7 +712,8 @@ m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                (0 + scale(log_fire_dist)|id) +
                                # (0 + scale(log_water_dist)|id) +
                                (0 + scale(snow_depth):scale(log_sl)|id) +
-                               (0 + scale(avg_min_temp):scale(log_sl)|id) +
+                               (0 + scale(avg_min_temp_1):scale(log_sl)|id) +
+                               (0 + scale(avg_min_temp_2):scale(log_sl)|id) +
                                (0 + fire_10_20_30|id) +
                                (0 + fire_40|id) +
                                # (0 + fire_10_20_30:scale(log_fire_dist)|id) +
@@ -689,32 +727,33 @@ m0_winter_glmmfit <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
 summary(m0_winter_glmmfit)
 
 saveRDS(issa_data_winter_comb, here("data/processed/issa_data_winter_comb.rds"))
+# issa_data_winter_comb <- readRDS(here("data/processed/issa_data_winter_comb.rds"))
 saveRDS(m0_winter_glmmfit, here("output/m0_winter_glmmfit.rds"))
 
 
 m0_winter_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                                  scale(sl_) +
                                   scale(mrdtm) +
                                   scale(tpi) +
                                   # scale(log_water_dist) +
-                                  # water +
                                   Wetland +
                                   Sub_polar_taiga_needleleaf_forest +
                                   Temperate_or_sub_polar_shrubland +
                                   Temperate_or_sub_polar_grassland +
-                                  # Mixed_forest +
                                   Barren_Lands +
                                   calving:scale(log_sl) +
                                   scale(snow_depth):scale(log_sl) +
-                                  scale(avg_min_temp):scale(log_sl) +
+                                  scale(avg_min_temp_1):scale(log_sl) +
+                                  scale(avg_min_temp_2):scale(log_sl) +
                                   (1|strat_id) +
                                   (0 + scale(log_sl)|id) +
+                                  (0 + scale(sl_)|id) +
                                   (0 + scale(cos_ta)|id) +
                                   (0 + scale(log_sl):scale(cos_ta)|id) +
                                   
                                   (0 + Wetland|id) +
                                   (0 + scale(tpi)|id) +
                                   (0 + scale(mrdtm)|id) +
-                                  # (0 + water|id) +
                                   # (0 + scale(log_water_dist)|id)  +
                                   (0 + Sub_polar_taiga_needleleaf_forest|id) +
                                   (0 + Temperate_or_sub_polar_shrubland|id) +
@@ -722,14 +761,40 @@ m0_winter_glmmfit_lc <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
                                   # (0 + Mixed_forest|id) +
                                   (0 + Barren_Lands|id) +
                                   (0 + calving:scale(log_sl)|id) +
-                                  (0 + scale(avg_min_temp):scale(log_sl)|id) +
+                                  (0 + scale(avg_min_temp_1):scale(log_sl)|id) +
+                                  (0 + scale(avg_min_temp_2):scale(log_sl)|id) +
                                   (0 + scale(snow_depth):scale(log_sl)|id) , 
                                 family = poisson,
                                 data = issa_data_winter_comb,
-                                map=list(theta=factor(c(NA,1:13))),
-                                start=list(theta=c(log(1e3),rep(0,13))))
+                                map=list(theta=factor(c(NA,1:14))),
+                                start=list(theta=c(log(1e3),rep(0,14))))
 summary(m0_winter_glmmfit_lc)
 saveRDS(m0_winter_glmmfit_lc, "output/m0_winter_glmmfit_lc.rds")
+
+m0_winter_glmmfit_null <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
+                                    scale(sl_) +
+                                  scale(mrdtm) +
+                                  scale(tpi) +
+                                  calving:scale(log_sl) +
+                                  scale(snow_depth):scale(log_sl) +
+                                  scale(avg_min_temp_1):scale(log_sl) +
+                                  scale(avg_min_temp_2):scale(log_sl) +
+                                  (1|strat_id) +
+                                  (0 + scale(log_sl)|id) +
+                                  (0 + scale(sl_)|id) +
+                                  (0 + scale(cos_ta)|id) +
+                                  (0 + scale(log_sl):scale(cos_ta)|id) +
+                                  (0 + scale(tpi)|id) +
+                                  (0 + scale(mrdtm)|id) +
+                                  (0 + calving:scale(log_sl)|id) +
+                                  (0 + scale(avg_min_temp_1):scale(log_sl)|id) +
+                                  (0 + scale(avg_min_temp_2):scale(log_sl)|id) +
+                                  (0 + scale(snow_depth):scale(log_sl)|id) , 
+                                family = poisson,
+                                data = issa_data_winter_comb,
+                                map=list(theta=factor(c(NA,1:14))),
+                                start=list(theta=c(log(1e3),rep(0,14))))
+summary(m0_winter_glmmfit_null)
 
 ```
 
@@ -742,5 +807,190 @@ summary(m0_winter_glmmfit)
 
 m0_winter_glmmfit_lc <- readRDS(here("output/m0_winter_glmmfit_lc.rds"))
 summary(m0_winter_glmmfit_lc)
+
+```
+
+```{r}
+#| label: model_accuracy
+#| dependson: "winter_models"
+#| eval: FALSE
+
+set.seed(25)
+test_collars <- sample(unique(issa_data_summer_comb$id),2)
+
+
+### Summer
+issa_data_summer_comb_sub <- issa_data_summer_comb %>%
+  filter(!(id %in% test_collars))
+
+m0_summer_glmmfit_sub <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) + 
+                                   scale(sl_) +
+                               scale(mrdtm) +
+                               scale(log_water_dist) +
+                               scale(log_fire_dist) +
+                               scale(log_fire_dist):fire_10_dup +
+                               scale(log_fire_dist):fire_20_dup +
+                               scale(log_fire_dist):fire_30_dup +
+                               scale(log_fire_dist):fire_40_dup +
+                               scale(tpi) +
+                               water +
+                               fire_10_low +
+                               fire_10_mod +
+                               fire_10_high +
+                               fire_20_low +
+                               fire_20_mod +
+                               fire_20_high +
+                               fire_30 +
+                               fire_40 +
+                               scale(log_sl):scale(avg_max_temp_1) +
+                               scale(log_sl):scale(avg_max_temp_2) +
+                               (1|strat_id) +
+                               (0 + scale(log_sl)|id) +
+                               (0 + scale(sl_)|id) +
+                               (0 + scale(cos_ta)|id) +
+                               (0 + scale(log_sl):scale(cos_ta)|id) +
+                               (0 + scale(tpi)|id) +
+                               (0 + scale(log_water_dist)|id) +
+                               (0 + scale(log_fire_dist)|id) +
+                               (0 + scale(log_fire_dist):fire_10_dup|id) +
+                               (0 + scale(log_fire_dist):fire_20_dup|id) +
+                               (0 + scale(log_fire_dist):fire_30_dup|id) +
+                               (0 + scale(log_fire_dist):fire_40_dup|id) +
+                               (0 + water|id) +
+                               (0 + scale(mrdtm)|id) +
+                               (0 + fire_10_low|id) +
+                               (0 + fire_10_mod|id) +
+                               (0 + fire_10_high|id) +
+                               (0 + fire_20_low|id) +
+                               (0 + fire_20_mod|id) +
+                               (0 + fire_20_high|id) +
+                               (0 + fire_30|id) +
+                               (0 + fire_40|id) +
+                               (0 + scale(log_sl):scale(avg_max_temp_1)|id) +
+                               (0 + scale(log_sl):scale(avg_max_temp_2)|id), 
+                             family = poisson,
+                             data = issa_data_summer_comb_sub,
+                             map=list(theta=factor(c(NA,1:23))),
+                             start=list(theta=c(log(1e3),rep(0,23))))
+summary(m0_summer_glmmfit_sub)
+
+preds_summ <- generate_uhc_predictions(m0_summer_glmmfit_sub,
+                                  issa_data_summer_comb,
+                                  test_collars,
+                                  nsim = 100)
+saveRDS(preds_summ, here("output/uhc_preds_summ.rds"))
+
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = mrdtm)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = tpi)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = log_fire_dist)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = log_water_dist)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = water)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = log_sl)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_summ %>% filter(data == "simulation"), aes(x = cos_ta)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_summ %>% filter(data == "observed"), colour = "red")
+
+preds_summ %>%
+  pivot_longer(starts_with("fire")&-ends_with("dup"), 
+               names_to = "fire", values_to = "value") %>%
+  group_by(data, sim, fire) %>%
+  summarise(count = sum(value)) %>%
+  group_by(data, sim) %>%
+  mutate(prop = count/sum(count)) %>%
+  ungroup() %>%
+  arrange(desc(data)) %>%
+  ggplot(aes(x = fire, y = prop,
+             colour = data, group = sim, alpha = data)) +
+  geom_point() +
+  scale_colour_manual(values = c("red", "grey")) +
+  scale_alpha_manual(values = c(1, 0.5))
+
+### Winter
+issa_data_winter_comb_sub <- issa_data_winter_comb %>%
+  filter(!(id %in% test_collars))
+
+m0_winter_glmmfit_lc_sub <- glmmTMB(case_ ~ -1 + scale(log_sl)*scale(cos_ta) +
+                                  scale(sl_) +    
+                                  scale(mrdtm) +
+                                  scale(tpi) +
+                                  Wetland +
+                                  Sub_polar_taiga_needleleaf_forest +
+                                  Temperate_or_sub_polar_shrubland +
+                                  Temperate_or_sub_polar_grassland +
+                                  Barren_Lands +
+                                  scale(log_sl):calving +
+                                  scale(log_sl):scale(snow_depth) +
+                                  scale(log_sl):scale(avg_min_temp_1) +
+                                  scale(log_sl):scale(avg_min_temp_2) +
+                                  (1|strat_id) +
+                                  (0 + scale(log_sl)|id) +
+                                  (0 + scale(sl_)|id) +
+                                  (0 + scale(cos_ta)|id) +
+                                  (0 + scale(log_sl):scale(cos_ta)|id) +
+                                  (0 + Wetland|id) +
+                                  (0 + scale(tpi)|id) +
+                                  (0 + scale(mrdtm)|id) +
+                                  (0 + Sub_polar_taiga_needleleaf_forest|id) +
+                                  (0 + Temperate_or_sub_polar_shrubland|id) +
+                                  (0 + Temperate_or_sub_polar_grassland|id) +
+                                  (0 + Barren_Lands|id) +
+                                  (0 + scale(log_sl):calving|id) +
+                                  (0 + scale(log_sl):scale(avg_min_temp_1)|id) +
+                                  (0 + scale(log_sl):scale(avg_min_temp_2)|id) +
+                                  (0 + scale(log_sl):scale(snow_depth)|id) , 
+                                family = poisson,
+                                data = issa_data_winter_comb_sub,
+                                map=list(theta=factor(c(NA,1:15))),
+                                start=list(theta=c(log(1e3),rep(0,15))))
+summary(m0_winter_glmmfit_lc_sub)
+
+preds_wint <- generate_uhc_predictions(m0_winter_glmmfit_lc_sub,
+                                  issa_data_winter_comb,
+                                  test_collars,
+                                  nsim = 100)
+saveRDS(preds_wint, here("output/uhc_preds_wint.rds"))
+
+ggplot(data = preds_wint %>% filter(data == "simulation"), aes(x = mrdtm)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_wint %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_wint %>% filter(data == "simulation"), aes(x = tpi)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_wint %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_wint %>% filter(data == "simulation"), aes(x = log_sl)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_wint %>% filter(data == "observed"), colour = "red")
+ggplot(data = preds_wint %>% filter(data == "simulation"), aes(x = cos_ta)) +
+  geom_density(aes(group = sim), colour = "grey", alpha = 0.5) +
+  geom_density(data = preds_wint %>% filter(data == "observed"), colour = "red")
+
+preds_wint %>%
+  pivot_longer(c(Wetland, Sub_polar_taiga_needleleaf_forest,
+                 Temperate_or_sub_polar_shrubland,
+                 Temperate_or_sub_polar_grassland,
+                 Barren_Lands), 
+               names_to = "lc", values_to = "value") %>%
+  group_by(data, sim, lc) %>%
+  summarise(count = sum(value)) %>%
+  group_by(data, sim) %>%
+  mutate(prop = count/sum(count)) %>%
+  ungroup() %>%
+  arrange(desc(data)) %>%
+  ggplot(aes(x = lc, y = prop,
+             colour = data, group = sim, alpha = data)) +
+  geom_point() +
+  scale_colour_manual(values = c("red", "grey")) +
+  scale_alpha_manual(values = c(1, 0.5))
 
 ```
